@@ -1,8 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HabitosNet.Models;
-using System.Collections.ObjectModel;
-using System.Windows.Input;
 
 namespace HabitosNet.PageModels
 {
@@ -14,6 +12,8 @@ namespace HabitosNet.PageModels
         private readonly CategoryRepository _categoryRepository;
         private readonly TagRepository _tagRepository;
         private readonly ModalErrorHandler _errorHandler;
+        private bool _canDelete;
+        private bool _isLoaded;
 
         [ObservableProperty]
         private string _name = string.Empty;
@@ -22,6 +22,7 @@ namespace HabitosNet.PageModels
         private string _description = string.Empty;
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasCompletedTasks))]
         private List<ProjectTask> _tasks = [];
 
         [ObservableProperty]
@@ -36,40 +37,57 @@ namespace HabitosNet.PageModels
         [ObservableProperty]
         private List<Tag> _allTags = [];
 
-        public IList<object> SelectedTags { get; set; } = new List<object>();
+        [ObservableProperty]
+        private IList<object> _selectedTags = new List<object>();
 
         [ObservableProperty]
         private IconData _icon;
 
         [ObservableProperty]
-        bool _isBusy;
+        private bool _isBusy;
 
         [ObservableProperty]
-        private List<IconData> _icons = new List<IconData>
-        {
-            new IconData { Icon = FluentUI.ribbon_24_regular, Description = "Ribbon Icon" },
-            new IconData { Icon = FluentUI.ribbon_star_24_regular, Description = "Ribbon Star Icon" },
-            new IconData { Icon = FluentUI.trophy_24_regular, Description = "Trophy Icon" },
-            new IconData { Icon = FluentUI.badge_24_regular, Description = "Badge Icon" },
-            new IconData { Icon = FluentUI.book_24_regular, Description = "Book Icon" },
-            new IconData { Icon = FluentUI.people_24_regular, Description = "People Icon" },
-            new IconData { Icon = FluentUI.bot_24_regular, Description = "Bot Icon" }
-        };
+        [NotifyPropertyChangedFor(nameof(HasValidationMessage))]
+        private string _validationMessage = string.Empty;
 
-        private bool _canDelete;
+        [ObservableProperty]
+        private List<IconData> _icons =
+        [
+            new() { Icon = FluentUI.ribbon_24_regular, Description = "Cinta" },
+            new() { Icon = FluentUI.ribbon_star_24_regular, Description = "Estrella" },
+            new() { Icon = FluentUI.trophy_24_regular, Description = "Trofeo" },
+            new() { Icon = FluentUI.badge_24_regular, Description = "Insignia" },
+            new() { Icon = FluentUI.book_24_regular, Description = "Libro" },
+            new() { Icon = FluentUI.people_24_regular, Description = "Personas" },
+            new() { Icon = FluentUI.bot_24_regular, Description = "Robot" }
+        ];
+
+        public bool HasValidationMessage => !string.IsNullOrWhiteSpace(ValidationMessage);
+        public bool CanSave => !IsBusy && _isLoaded;
+        public bool HasCompletedTasks => Tasks.Any(t => t.IsCompleted);
 
         public bool CanDelete
         {
-            get => _canDelete;
-            set
+            get => _canDelete && !IsBusy && _isLoaded;
+            private set
             {
-                _canDelete = value;
+                SetProperty(ref _canDelete, value);
                 DeleteCommand.NotifyCanExecuteChanged();
             }
         }
 
-        public bool HasCompletedTasks
-            => _project?.Tasks.Any(t => t.IsCompleted) ?? false;
+        partial void OnIsBusyChanged(bool value)
+        {
+            OnPropertyChanged(nameof(CanSave));
+            OnPropertyChanged(nameof(CanDelete));
+            SaveCommand.NotifyCanExecuteChanged();
+            DeleteCommand.NotifyCanExecuteChanged();
+            AddTaskCommand.NotifyCanExecuteChanged();
+            CleanTasksCommand.NotifyCanExecuteChanged();
+            TaskCompletedCommand.NotifyCanExecuteChanged();
+            NavigateToTaskCommand.NotifyCanExecuteChanged();
+            ToggleTagCommand.NotifyCanExecuteChanged();
+        }
 
         public ProjectDetailPageModel(ProjectRepository projectRepository, TaskRepository taskRepository, CategoryRepository categoryRepository, TagRepository tagRepository, ModalErrorHandler errorHandler)
         {
@@ -79,256 +97,301 @@ namespace HabitosNet.PageModels
             _tagRepository = tagRepository;
             _errorHandler = errorHandler;
             _icon = _icons.First();
-            Tasks = [];
         }
 
         public void ApplyQueryAttributes(IDictionary<string, object> query)
         {
-            if (query.ContainsKey("id"))
-            {
-                int id = Convert.ToInt32(query["id"]);
-                LoadData(id).FireAndForgetSafeAsync(_errorHandler);
-            }
-            else if (query.ContainsKey("refresh"))
-            {
+            // Returning from a task must preserve unsaved project fields and tag choices.
+            if (query.ContainsKey("refresh") && _project is not null)
                 RefreshData().FireAndForgetSafeAsync(_errorHandler);
-            }
+            else if (query.TryGetValue("id", out var id))
+                LoadData(Convert.ToInt32(id)).FireAndForgetSafeAsync(_errorHandler);
             else
-            {
-                Task.WhenAll(LoadCategories(), LoadTags()).FireAndForgetSafeAsync(_errorHandler);
-                _project = new();
-                _project.Tags = [];
-                _project.Tasks = [];
-                Tasks = _project.Tasks;
-            }
+                LoadData(null).FireAndForgetSafeAsync(_errorHandler);
         }
 
-        private async Task LoadCategories() =>
-            Categories = await _categoryRepository.ListAsync();
-
-        private async Task LoadTags() =>
-            AllTags = await _tagRepository.ListAsync();
+        private void SetTasks(IEnumerable<ProjectTask> tasks)
+        {
+            Tasks = new(tasks);
+            if (_project is not null)
+                _project.Tasks = Tasks;
+        }
 
         private async Task RefreshData()
         {
-            if (_project.IsNullOrNew())
-            {
-                if (_project is not null)
-                    Tasks = new(_project.Tasks);
-
-                return;
-            }
-
-            Tasks = await _taskRepository.ListAsync(_project.ID);
-            _project.Tasks = Tasks;
-        }
-
-        private async Task LoadData(int id)
-        {
+            IsBusy = true;
             try
             {
-                IsBusy = true;
-
-                _project = await _projectRepository.GetAsync(id);
-
-                if (_project.IsNullOrNew())
+                if (_project is not null)
                 {
-                    _errorHandler.HandleError(new Exception($"Project with id {id} could not be found."));
+                    if (_project.ID == 0)
+                        SetTasks(_project.Tasks);
+                    else
+                    {
+                        // Retain pending tasks if an earlier project save completed only partially.
+                        var pendingTasks = _project.Tasks.Where(t => t.ID == 0).ToList();
+                        var savedTasks = await _taskRepository.ListAsync(_project.ID);
+                        SetTasks(savedTasks.Concat(pendingTasks));
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                ValidationMessage = "No se pudieron actualizar las tareas. Inténtalo de nuevo.";
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        private async Task LoadData(int? id)
+        {
+            _isLoaded = false;
+            IsBusy = true;
+            ValidationMessage = string.Empty;
+            CanDelete = false;
+            Name = string.Empty;
+            Description = string.Empty;
+            Category = null;
+            CategoryIndex = -1;
+            Categories = [];
+            AllTags = [];
+            SelectedTags = new List<object>();
+            Icon = Icons.First();
+            Tasks = [];
+            _project = null;
+
+            try
+            {
+                _project = id.HasValue ? await _projectRepository.GetAsync(id.Value) : new Project();
+                if (_project is null)
+                {
+                    ValidationMessage = "No se encontró el proyecto. Vuelve al listado y actualízalo.";
                     return;
                 }
 
                 Name = _project.Name;
                 Description = _project.Description;
-                Tasks = _project.Tasks;
-
-                foreach (var icon in Icons)
-                {
-                    if (icon.Icon == _project.Icon)
-                    {
-                        Icon = icon;
-                        break;
-                    }
-                }
-
+                SetTasks(_project.Tasks);
+                Icon = Icons.FirstOrDefault(icon => icon.Icon == _project.Icon) ?? Icons.First();
                 Categories = await _categoryRepository.ListAsync();
-                Category = Categories?.FirstOrDefault(c => c.ID == _project.CategoryID);
-                CategoryIndex = Categories?.FindIndex(c => c.ID == _project.CategoryID) ?? -1;
+                CategoryIndex = Categories.FindIndex(c => c.ID == _project.CategoryID);
+                Category = CategoryIndex >= 0 ? Categories[CategoryIndex] : null;
 
-                var allTags = await _tagRepository.ListAsync();
-                foreach (var tag in allTags)
-                {
+                var tags = await _tagRepository.ListAsync();
+                foreach (var tag in tags)
                     tag.IsSelected = _project.Tags.Any(t => t.ID == tag.ID);
-                    if (tag.IsSelected)
-                    {
-                        SelectedTags.Add(tag);
-                    }
-                }
-                AllTags = new(allTags);
+                AllTags = tags;
+                SelectedTags = tags.Where(t => t.IsSelected).Cast<object>().ToList();
+                _isLoaded = true;
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                _errorHandler.HandleError(e);
+                ValidationMessage = "No se pudo cargar el proyecto. Vuelve atrás e inténtalo de nuevo.";
             }
             finally
             {
+                CanDelete = _project?.ID > 0;
                 IsBusy = false;
-                CanDelete = !_project.IsNullOrNew();
-                OnPropertyChanged(nameof(HasCompletedTasks));
             }
         }
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanSave))]
         private async Task TaskCompleted(ProjectTask task)
         {
-            await _taskRepository.SaveItemAsync(task);
-            OnPropertyChanged(nameof(HasCompletedTasks));
-        }
-
-        [RelayCommand]
-        private async Task Save()
-        {
-            if (_project is null)
+            ValidationMessage = string.Empty;
+            // Draft tasks belong only to memory until their parent project has an ID.
+            if (_project is null || _project.ID == 0 || task.ID == 0)
             {
-                _errorHandler.HandleError(
-                    new Exception("Project is null. Cannot Save."));
-
+                OnPropertyChanged(nameof(HasCompletedTasks));
                 return;
             }
 
-            _project.Name = Name;
-            _project.Description = Description;
-            _project.CategoryID = Category?.ID ?? 0;
-            _project.Icon = Icon.Icon ?? FluentUI.ribbon_24_regular;
-            await _projectRepository.SaveItemAsync(_project);
-
-            foreach (var tag in AllTags)
+            IsBusy = true;
+            try
             {
-                if (tag.IsSelected)
-                {
-                    await _tagRepository.SaveItemAsync(tag, _project.ID);
-                }
+                await _taskRepository.SaveItemAsync(task);
             }
-
-            foreach (var task in _project.Tasks)
+            catch (Exception)
             {
-                if (task.ID == 0)
-                {
-                    task.ProjectID = _project.ID;
-                    await _taskRepository.SaveItemAsync(task);
-                }
+                task.IsCompleted = !task.IsCompleted;
+                ValidationMessage = "No se pudo cambiar el estado de la tarea. Inténtalo de nuevo.";
             }
-
-            await Shell.Current.GoToAsync("..");
-            await AppShell.DisplayToastAsync("Project saved");
+            finally
+            {
+                OnPropertyChanged(nameof(HasCompletedTasks));
+                IsBusy = false;
+            }
         }
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanSave))]
+        private async Task Save()
+        {
+            ValidationMessage = string.Empty;
+            if (_project is null || !_isLoaded)
+            {
+                ValidationMessage = "No se pudo cargar el proyecto. Vuelve atrás e inténtalo de nuevo.";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(Name))
+            {
+                ValidationMessage = "Escribe un nombre para el proyecto.";
+                return;
+            }
+
+            IsBusy = true;
+            try
+            {
+                _project.Name = Name.Trim();
+                _project.Description = Description.Trim();
+                _project.CategoryID = Category?.ID ?? 0;
+                _project.Icon = Icon?.Icon ?? FluentUI.ribbon_24_regular;
+                await _projectRepository.SaveItemAsync(_project);
+
+                foreach (var tag in AllTags)
+                {
+                    if (tag.IsSelected)
+                        await _tagRepository.SaveItemAsync(tag, _project.ID);
+                    else
+                        await _tagRepository.DeleteItemAsync(tag, _project.ID);
+                }
+                _project.Tags = AllTags.Where(t => t.IsSelected).ToList();
+
+                foreach (var task in _project.Tasks)
+                {
+                    if (task.ID == 0)
+                    {
+                        task.ProjectID = _project.ID;
+                        await _taskRepository.SaveItemAsync(task);
+                    }
+                }
+
+                await Shell.Current.GoToAsync("..");
+                await AppShell.DisplayToastAsync("Proyecto guardado");
+            }
+            catch (Exception)
+            {
+                ValidationMessage = "No se pudo completar el guardado. Tus cambios siguen aquí; inténtalo de nuevo.";
+            }
+            finally
+            {
+                CanDelete = _project.ID > 0;
+                IsBusy = false;
+            }
+        }
+
+        [RelayCommand(CanExecute = nameof(CanSave))]
         private async Task AddTask()
         {
             if (_project is null)
-            {
-                _errorHandler.HandleError(
-                    new Exception("Project is null. Cannot navigate to task."));
-
                 return;
-            }
 
-            // Pass the project so if this is a new project we can just add
-            // the tasks to the project and then save them all from here.
-            await Shell.Current.GoToAsync($"task",
-                new ShellNavigationQueryParameters(){
-                    {TaskDetailPageModel.ProjectQueryKey, _project}
-                });
+            _project.Name = Name.Trim();
+            await Shell.Current.GoToAsync("task", new ShellNavigationQueryParameters
+            {
+                { TaskDetailPageModel.ProjectQueryKey, _project }
+            });
         }
 
         [RelayCommand(CanExecute = nameof(CanDelete))]
         private async Task Delete()
         {
-            if (_project.IsNullOrNew())
-            {
-                await Shell.Current.GoToAsync("..");
+            if (_project is null || _project.ID == 0)
                 return;
-            }
 
-            await _projectRepository.DeleteItemAsync(_project);
-            await Shell.Current.GoToAsync("..");
-            await AppShell.DisplayToastAsync("Project deleted");
+            IsBusy = true;
+            ValidationMessage = string.Empty;
+            try
+            {
+                if (!await Shell.Current.DisplayAlertAsync("Eliminar proyecto", "Se eliminarán el proyecto y todas sus tareas. Esta acción no se puede deshacer.", "Eliminar", "Cancelar"))
+                    return;
+
+                await _projectRepository.DeleteItemAsync(_project);
+                await Shell.Current.GoToAsync("..");
+                await AppShell.DisplayToastAsync("Proyecto eliminado");
+            }
+            catch (Exception)
+            {
+                ValidationMessage = "No se pudo eliminar el proyecto. Inténtalo de nuevo.";
+            }
+            finally
+            {
+                IsBusy = false;
+            }
         }
 
-        [RelayCommand]
-        private Task NavigateToTask(ProjectTask task) =>
-            Shell.Current.GoToAsync($"task?id={task.ID}");
+        [RelayCommand(CanExecute = nameof(CanSave))]
+        private Task NavigateToTask(ProjectTask task)
+        {
+            if (_project is null)
+                return Task.CompletedTask;
 
-        [RelayCommand]
-        internal async Task ToggleTag(Tag tag)
+            var parameters = new ShellNavigationQueryParameters
+            {
+                { TaskDetailPageModel.ProjectQueryKey, _project }
+            };
+            if (task.ID == 0)
+                parameters.Add(TaskDetailPageModel.TaskQueryKey, task);
+            else
+                parameters.Add("id", task.ID);
+            return Shell.Current.GoToAsync("task", parameters);
+        }
+
+        [RelayCommand(CanExecute = nameof(CanSave))]
+        internal Task ToggleTag(Tag tag)
         {
             tag.IsSelected = !tag.IsSelected;
-
-            if (!_project.IsNullOrNew())
-            {
-                if (tag.IsSelected)
-                {
-                    await _tagRepository.SaveItemAsync(tag, _project.ID);
-                }
-                else
-                {
-                    await _tagRepository.DeleteItemAsync(tag, _project.ID);
-                }
-            }
-
             AllTags = new(AllTags);
-            SemanticScreenReader.Announce($"{tag.Title} {(tag.IsSelected ? "selected" : "unselected")}");
+            SelectedTags = AllTags.Where(t => t.IsSelected).Cast<object>().ToList();
+            SemanticScreenReader.Announce($"{tag.Title}: {(tag.IsSelected ? "seleccionada" : "sin seleccionar")}");
+            return Task.CompletedTask;
         }
 
         [RelayCommand]
         private void IconSelected(IconData icon)
-        {
-            SemanticScreenReader.Announce($"{icon.Description} selected");
-        }
+            => SemanticScreenReader.Announce($"{icon.Description}: seleccionado");
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanSave))]
         private async Task CleanTasks()
         {
-            var completedTasks = Tasks.Where(t => t.IsCompleted).ToArray();
-            foreach (var task in completedTasks)
+            IsBusy = true;
+            ValidationMessage = string.Empty;
+            try
             {
-                await _taskRepository.DeleteItemAsync(task);
-                Tasks.Remove(task);
-            }
+                var completedTasks = Tasks.Where(t => t.IsCompleted).ToArray();
+                foreach (var task in completedTasks)
+                {
+                    if (task.ID > 0)
+                        await _taskRepository.DeleteItemAsync(task);
+                    Tasks.Remove(task);
+                }
 
-            Tasks = new(Tasks);
-            OnPropertyChanged(nameof(HasCompletedTasks));
-            await AppShell.DisplayToastAsync("All cleaned up!");
+                await AppShell.DisplayToastAsync("Tareas completadas eliminadas");
+            }
+            catch (Exception)
+            {
+                ValidationMessage = "No se pudieron eliminar todas las tareas completadas. Inténtalo de nuevo.";
+            }
+            finally
+            {
+                SetTasks(Tasks);
+                IsBusy = false;
+            }
         }
 
         [RelayCommand]
-        private async Task SelectionChanged(object parameter)
+        private Task SelectionChanged(object parameter)
         {
-            if (parameter is IEnumerable<object> enumerableParameter)
-            {
-                var currentSelection = enumerableParameter.OfType<Tag>().ToList();
-                var previousSelection = AllTags.Where(t => t.IsSelected).ToList();
+            if (parameter is not IEnumerable<object> selection)
+                return Task.CompletedTask;
 
-                // Handle newly selected tags
-                foreach (var tag in currentSelection.Except(previousSelection))
-                {
-                    tag.IsSelected = true;
-                    if (!_project.IsNullOrNew())
-                    {
-                        await _tagRepository.SaveItemAsync(tag, _project.ID);
-                    }
-                }
-
-                // Handle deselected tags
-                foreach (var tag in previousSelection.Except(currentSelection))
-                {
-                    tag.IsSelected = false;
-                    if (!_project.IsNullOrNew())
-                    {
-                        await _tagRepository.DeleteItemAsync(tag, _project.ID);
-                    }
-                }
-            }
+            var selectedIds = selection.OfType<Tag>().Select(t => t.ID).ToHashSet();
+            foreach (var tag in AllTags)
+                tag.IsSelected = selectedIds.Contains(tag.ID);
+            AllTags = new(AllTags);
+            return Task.CompletedTask;
         }
     }
 }

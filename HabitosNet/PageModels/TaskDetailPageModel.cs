@@ -1,16 +1,18 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using HabitosNet.Data;
 using HabitosNet.Models;
-using HabitosNet.Services;
 
 namespace HabitosNet.PageModels
 {
     public partial class TaskDetailPageModel : ObservableObject, IQueryAttributable
     {
         public const string ProjectQueryKey = "project";
+        public const string TaskQueryKey = "taskDraft";
         private ProjectTask? _task;
+        private Project? _sourceProject;
+        private Project? _draftProject;
         private bool _canDelete;
+        private bool _isLoaded;
         private readonly ProjectRepository _projectRepository;
         private readonly TaskRepository _taskRepository;
         private readonly ModalErrorHandler _errorHandler;
@@ -30,9 +32,36 @@ namespace HabitosNet.PageModels
         [ObservableProperty]
         private int _selectedProjectIndex = -1;
 
-
         [ObservableProperty]
         private bool _isExistingProject;
+
+        [ObservableProperty]
+        private bool _isBusy;
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasValidationMessage))]
+        private string _validationMessage = string.Empty;
+
+        public bool HasValidationMessage => !string.IsNullOrWhiteSpace(ValidationMessage);
+        public bool CanSave => !IsBusy && _isLoaded;
+
+        public bool CanDelete
+        {
+            get => _canDelete && !IsBusy && _isLoaded;
+            private set
+            {
+                SetProperty(ref _canDelete, value);
+                DeleteCommand.NotifyCanExecuteChanged();
+            }
+        }
+
+        partial void OnIsBusyChanged(bool value)
+        {
+            OnPropertyChanged(nameof(CanSave));
+            OnPropertyChanged(nameof(CanDelete));
+            SaveCommand.NotifyCanExecuteChanged();
+            DeleteCommand.NotifyCanExecuteChanged();
+        }
 
         public TaskDetailPageModel(ProjectRepository projectRepository, TaskRepository taskRepository, ModalErrorHandler errorHandler)
         {
@@ -42,133 +71,174 @@ namespace HabitosNet.PageModels
         }
 
         public void ApplyQueryAttributes(IDictionary<string, object> query)
-        {
-            LoadTaskAsync(query).FireAndForgetSafeAsync(_errorHandler);
-        }
+            => LoadTaskAsync(query).FireAndForgetSafeAsync(_errorHandler);
 
         private async Task LoadTaskAsync(IDictionary<string, object> query)
         {
-            if (query.TryGetValue(ProjectQueryKey, out var project))
-                Project = (Project)project;
+            _isLoaded = false;
+            IsBusy = true;
+            ValidationMessage = string.Empty;
+            Title = string.Empty;
+            IsCompleted = false;
+            Projects = [];
+            Project = null;
+            SelectedProjectIndex = -1;
+            IsExistingProject = true;
+            CanDelete = false;
+            _task = null;
+            _sourceProject = query.TryGetValue(ProjectQueryKey, out var project) ? project as Project : null;
+            _draftProject = _sourceProject?.ID == 0 ? _sourceProject : null;
 
-            int taskId = 0;
-
-            if (query.ContainsKey("id"))
+            try
             {
-                taskId = Convert.ToInt32(query["id"]);
-                _task = await _taskRepository.GetAsync(taskId);
-
-                if (_task is null)
+                if (query.TryGetValue(TaskQueryKey, out var draft) && draft is ProjectTask draftTask)
                 {
-                    _errorHandler.HandleError(new Exception($"Task Id {taskId} isn't valid."));
-                    return;
+                    if (_sourceProject is null || !_sourceProject.Tasks.Contains(draftTask))
+                    {
+                        ValidationMessage = "No se encontró la tarea en el borrador del proyecto.";
+                        return;
+                    }
+
+                    _draftProject = _sourceProject;
+                    _task = draftTask;
+                    CanDelete = true;
+                }
+                else if (query.TryGetValue("id", out var id))
+                {
+                    _task = await _taskRepository.GetAsync(Convert.ToInt32(id));
+                    if (_task is null)
+                    {
+                        ValidationMessage = "No se encontró la tarea. Vuelve al listado y actualízalo.";
+                        return;
+                    }
+
+                    CanDelete = true;
+                }
+                else
+                {
+                    _task = new ProjectTask { ProjectID = _sourceProject?.ID ?? 0 };
                 }
 
-                Project = await _projectRepository.GetAsync(_task.ProjectID);
-            }
-            else
-            {
-                _task = new ProjectTask();
-            }
-
-            // If the project is new, we don't need to load the project dropdown
-            if (Project?.ID == 0)
-            {
-                IsExistingProject = false;
-            }
-            else
-            {
-                Projects = await _projectRepository.ListAsync();
-                IsExistingProject = true;
-            }
-
-            if (Project is not null)
-                SelectedProjectIndex = Projects.FindIndex(p => p.ID == Project.ID);
-            else if (_task?.ProjectID > 0)
-                SelectedProjectIndex = Projects.FindIndex(p => p.ID == _task.ProjectID);
-
-            if (taskId > 0)
-            {
-                if (_task is null)
+                IsExistingProject = _draftProject is null;
+                if (_draftProject is not null)
                 {
-                    _errorHandler.HandleError(new Exception($"Task with id {taskId} could not be found."));
-                    return;
+                    Project = _draftProject;
+                }
+                else
+                {
+                    Projects = await _projectRepository.ListAsync();
+                    SelectedProjectIndex = Projects.FindIndex(p => p.ID == _task.ProjectID);
+                    Project = SelectedProjectIndex >= 0 ? Projects[SelectedProjectIndex] : null;
+                    if (Projects.Count == 0)
+                        ValidationMessage = "Crea primero un proyecto para poder guardar tareas.";
                 }
 
                 Title = _task.Title;
                 IsCompleted = _task.IsCompleted;
-                CanDelete = true;
+                _isLoaded = true;
             }
-            else
+            catch (Exception)
             {
-                _task = new ProjectTask()
-                {
-                    ProjectID = Project?.ID ?? 0
-                };
+                ValidationMessage = "No se pudo cargar la tarea. Vuelve atrás e inténtalo de nuevo.";
+            }
+            finally
+            {
+                IsBusy = false;
             }
         }
 
-        public bool CanDelete
-        {
-            get => _canDelete;
-            set
-            {
-                _canDelete = value;
-                DeleteCommand.NotifyCanExecuteChanged();
-            }
-        }
-
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanSave))]
         private async Task Save()
         {
-            if (_task is null)
+            ValidationMessage = string.Empty;
+            if (_task is null || !_isLoaded)
             {
-                _errorHandler.HandleError(
-                    new Exception("Task or project is null. The task could not be saved."));
-
+                ValidationMessage = "No se pudo cargar la tarea. Vuelve atrás e inténtalo de nuevo.";
                 return;
             }
 
-            _task.Title = Title;
+            if (string.IsNullOrWhiteSpace(Title))
+            {
+                ValidationMessage = "Escribe un nombre para la tarea.";
+                return;
+            }
 
-            int projectId = Project?.ID ?? 0;
+            var destination = _draftProject ??
+                (SelectedProjectIndex >= 0 && SelectedProjectIndex < Projects.Count ? Projects[SelectedProjectIndex] : null);
+            if (destination is null || (_draftProject is null && destination.ID <= 0))
+            {
+                ValidationMessage = "Selecciona un proyecto antes de guardar la tarea.";
+                return;
+            }
 
-            if (Projects.Count > SelectedProjectIndex && SelectedProjectIndex >= 0)
-                _task.ProjectID = projectId = Projects[SelectedProjectIndex].ID;
+            IsBusy = true;
+            try
+            {
+                // Write a copy first so a failed write does not alter the previous screen's task.
+                var savedTask = new ProjectTask
+                {
+                    ID = _task.ID,
+                    Title = Title.Trim(),
+                    IsCompleted = IsCompleted,
+                    ProjectID = destination.ID
+                };
 
-            _task.IsCompleted = IsCompleted;
+                if (_draftProject is null)
+                    await _taskRepository.SaveItemAsync(savedTask);
 
-            if (Project?.ID == projectId && !Project.Tasks.Contains(_task))
-                Project.Tasks.Add(_task);
+                _task.ID = savedTask.ID;
+                _task.Title = savedTask.Title;
+                _task.IsCompleted = savedTask.IsCompleted;
+                _task.ProjectID = savedTask.ProjectID;
 
-            if (_task.ProjectID > 0)
-                _taskRepository.SaveItemAsync(_task).FireAndForgetSafeAsync(_errorHandler);
+                if (_sourceProject is not null)
+                {
+                    _sourceProject.Tasks.RemoveAll(t => ReferenceEquals(t, _task) || (_task.ID > 0 && t.ID == _task.ID));
+                    if (_sourceProject.ID == destination.ID)
+                        _sourceProject.Tasks.Add(_task);
+                }
 
-            await Shell.Current.GoToAsync("..?refresh=true");
-
-            if (_task.ID > 0)
-                await AppShell.DisplayToastAsync("Task saved");
+                await Shell.Current.GoToAsync("..?refresh=true");
+                await AppShell.DisplayToastAsync(_draftProject is null ? "Tarea guardada" : "Tarea añadida al borrador");
+            }
+            catch (Exception)
+            {
+                ValidationMessage = "No se pudo guardar la tarea. Tus cambios siguen aquí; inténtalo de nuevo.";
+            }
+            finally
+            {
+                IsBusy = false;
+            }
         }
 
         [RelayCommand(CanExecute = nameof(CanDelete))]
         private async Task Delete()
         {
-            if (_task is null || Project is null)
-            {
-                _errorHandler.HandleError(
-                    new Exception("Task is null. The task could not be deleted."));
-
+            if (_task is null)
                 return;
+
+            IsBusy = true;
+            ValidationMessage = string.Empty;
+            try
+            {
+                if (!await Shell.Current.DisplayAlertAsync("Eliminar tarea", "¿Quieres eliminar esta tarea?", "Eliminar", "Cancelar"))
+                    return;
+
+                if (_task.ID > 0)
+                    await _taskRepository.DeleteItemAsync(_task);
+
+                _sourceProject?.Tasks.RemoveAll(t => ReferenceEquals(t, _task) || (_task.ID > 0 && t.ID == _task.ID));
+                await Shell.Current.GoToAsync("..?refresh=true");
+                await AppShell.DisplayToastAsync("Tarea eliminada");
             }
-
-            if (Project.Tasks.Contains(_task))
-                Project.Tasks.Remove(_task);
-
-            if (_task.ID > 0)
-                await _taskRepository.DeleteItemAsync(_task);
-
-            await Shell.Current.GoToAsync("..?refresh=true");
-            await AppShell.DisplayToastAsync("Task deleted");
+            catch (Exception)
+            {
+                ValidationMessage = "No se pudo eliminar la tarea. Inténtalo de nuevo.";
+            }
+            finally
+            {
+                IsBusy = false;
+            }
         }
     }
 }

@@ -9,20 +9,27 @@ namespace HabitosNet
         public AppShell()
         {
             InitializeComponent();
-            var currentTheme = Application.Current!.RequestedTheme;
+            var savedTheme = Preferences.Default.Get("app_theme", string.Empty);
+            var currentTheme = Enum.TryParse<AppTheme>(savedTheme, out var theme) ? theme : Application.Current!.RequestedTheme;
             ThemeSegmentedControl.SelectedIndex = currentTheme == AppTheme.Light ? 0 : 1;
+            Application.Current!.UserAppTheme = currentTheme;
+        }
+
+        private void OnShellSizeChanged(object? sender, EventArgs e)
+        {
+            FlyoutBehavior = Width >= 1200 ? FlyoutBehavior.Locked : FlyoutBehavior.Flyout;
         }
         public static async Task DisplaySnackbarAsync(string message)
         {
-            CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+            using CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
             var snackbarOptions = new SnackbarOptions
             {
-                BackgroundColor = Color.FromArgb("#FF3300"),
+                BackgroundColor = Color.FromArgb("#0C554F"),
                 TextColor = Colors.White,
                 ActionButtonTextColor = Colors.Yellow,
-                CornerRadius = new CornerRadius(0),
-                Font = Font.SystemFontOfSize(18),
+                CornerRadius = new CornerRadius(12),
+                Font = Font.SystemFontOfSize(16),
                 ActionButtonFont = Font.SystemFontOfSize(14)
             };
 
@@ -33,19 +40,23 @@ namespace HabitosNet
 
         public static async Task DisplayToastAsync(string message)
         {
-            // Toast is currently not working in MCT on Windows
+            // Windows uses an in-app snackbar, which doesn't require toast registration.
             if (OperatingSystem.IsWindows())
+            {
+                await DisplaySnackbarAsync(message);
                 return;
+            }
 
             var toast = Toast.Make(message, textSize: 18);
 
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await toast.Show(cts.Token);
         }
 
         private void SfSegmentedControl_SelectionChanged(object? sender, Syncfusion.Maui.Toolkit.SegmentedControl.SelectionChangedEventArgs e)
         {
             Application.Current!.UserAppTheme = e.NewIndex == 0 ? AppTheme.Light : AppTheme.Dark;
+            Preferences.Default.Set("app_theme", Application.Current.UserAppTheme.ToString());
         }
     }
 }

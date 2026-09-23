@@ -32,6 +32,12 @@ namespace HabitosNet.Pages.Controls
             if (task.IsCompleted == e.Value)
                 return;
 
+            if (TaskCompletedCommand?.CanExecute(task) != true)
+            {
+                checkbox.IsChecked = task.IsCompleted;
+                return;
+            }
+
             task.IsCompleted = e.Value;
             TaskCompletedCommand?.Execute(task);
         }

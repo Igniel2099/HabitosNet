@@ -1,11 +1,16 @@
-namespace HabitosNet.Pages
+namespace HabitosNet.Pages;
+
+public partial class ProjectListPage : ContentPage
 {
-    public partial class ProjectListPage : ContentPage
+    public ProjectListPage(ProjectListPageModel model)
     {
-        public ProjectListPage(ProjectListPageModel model)
-        {
-            BindingContext = model;
-            InitializeComponent();
-        }
+        InitializeComponent();
+        BindingContext = model;
+    }
+
+    private void OnSizeChanged(object? sender, EventArgs e)
+    {
+        if (ProjectLayout is not null)
+            ProjectLayout.Span = Width >= 1100 ? 3 : Width >= 720 ? 2 : 1;
     }
 }

@@ -18,9 +18,17 @@ namespace HabitosNet.Models
 
         public List<Tag> Tags { get; set; } = [];
 
+        [JsonIgnore]
+        public string TaskSummary => Tasks.Count == 0
+            ? "Todavía sin tareas"
+            : $"{Tasks.Count(t => t.IsCompleted)} de {Tasks.Count} tareas completadas";
+
+        [JsonIgnore]
+        public double Progress => Tasks.Count == 0 ? 0 : (double)Tasks.Count(t => t.IsCompleted) / Tasks.Count;
+
         public string AccessibilityDescription
         {
-            get { return $"{Name} Project. {Description}"; }
+            get { return $"{Name}. {Description}. {TaskSummary}"; }
         }
 
         public override string ToString() => $"{Name}";

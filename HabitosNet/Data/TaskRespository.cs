@@ -24,7 +24,7 @@ namespace HabitosNet.Data
         /// <summary>
         /// Initializes the database connection and creates the Task table if it does not exist.
         /// </summary>
-        private async Task Init()
+        internal async Task EnsureInitializedAsync()
         {
             if (_hasBeenInitialized)
                 return;
@@ -59,7 +59,7 @@ namespace HabitosNet.Data
         /// <returns>A list of <see cref="ProjectTask"/> objects.</returns>
         public async Task<List<ProjectTask>> ListAsync()
         {
-            await Init();
+            await EnsureInitializedAsync();
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 
@@ -89,7 +89,7 @@ namespace HabitosNet.Data
         /// <returns>A list of <see cref="ProjectTask"/> objects.</returns>
         public async Task<List<ProjectTask>> ListAsync(int projectId)
         {
-            await Init();
+            await EnsureInitializedAsync();
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 
@@ -120,7 +120,7 @@ namespace HabitosNet.Data
         /// <returns>A <see cref="ProjectTask"/> object if found; otherwise, null.</returns>
         public async Task<ProjectTask?> GetAsync(int id)
         {
-            await Init();
+            await EnsureInitializedAsync();
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 
@@ -150,11 +150,30 @@ namespace HabitosNet.Data
         /// <returns>The ID of the saved task.</returns>
         public async Task<int> SaveItemAsync(ProjectTask item)
         {
-            await Init();
+            if (item.ProjectID <= 0)
+                throw new InvalidOperationException("Selecciona y guarda un proyecto antes de guardar la tarea.");
+
+            await EnsureInitializedAsync();
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 
-            var saveCmd = connection.CreateCommand();
+            await using var transaction = connection.BeginTransaction();
+            using var checkCmd = connection.CreateCommand();
+            checkCmd.Transaction = transaction;
+            checkCmd.CommandText = "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'Project')";
+            var projectExists = Convert.ToInt64(await checkCmd.ExecuteScalarAsync()) != 0;
+            if (projectExists)
+            {
+                checkCmd.CommandText = "SELECT EXISTS (SELECT 1 FROM Project WHERE ID = @projectId)";
+                checkCmd.Parameters.AddWithValue("@projectId", item.ProjectID);
+                projectExists = Convert.ToInt64(await checkCmd.ExecuteScalarAsync()) != 0;
+            }
+
+            if (!projectExists)
+                throw new InvalidOperationException("El proyecto de esta tarea ya no existe. Selecciona otro proyecto.");
+
+            using var saveCmd = connection.CreateCommand();
+            saveCmd.Transaction = transaction;
             if (item.ID == 0)
             {
                 saveCmd.CommandText = @"
@@ -173,6 +192,7 @@ namespace HabitosNet.Data
             saveCmd.Parameters.AddWithValue("@projectId", item.ProjectID);
 
             var result = await saveCmd.ExecuteScalarAsync();
+            await transaction.CommitAsync();
             if (item.ID == 0)
             {
                 item.ID = Convert.ToInt32(result);
@@ -188,7 +208,7 @@ namespace HabitosNet.Data
         /// <returns>The number of rows affected.</returns>
         public async Task<int> DeleteItemAsync(ProjectTask item)
         {
-            await Init();
+            await EnsureInitializedAsync();
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 
@@ -204,7 +224,7 @@ namespace HabitosNet.Data
         /// </summary>
         public async Task DropTableAsync()
         {
-            await Init();
+            await EnsureInitializedAsync();
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 

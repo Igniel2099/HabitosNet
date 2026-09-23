@@ -111,25 +111,30 @@ namespace HabitosNet.Data
             selectCmd.CommandText = "SELECT * FROM Project WHERE ID = @id";
             selectCmd.Parameters.AddWithValue("@id", id);
 
-            await using var reader = await selectCmd.ExecuteReaderAsync();
-            if (await reader.ReadAsync())
+            Project? project = null;
+            await using (var reader = await selectCmd.ExecuteReaderAsync())
             {
-                var project = new Project
+                if (await reader.ReadAsync())
                 {
-                    ID = reader.GetInt32(0),
-                    Name = reader.GetString(1),
-                    Description = reader.GetString(2),
-                    Icon = reader.GetString(3),
-                    CategoryID = reader.GetInt32(4)
-                };
-
-                project.Tags = await _tagRepository.ListAsync(project.ID);
-                project.Tasks = await _taskRepository.ListAsync(project.ID);
-
-                return project;
+                    project = new Project
+                    {
+                        ID = reader.GetInt32(0),
+                        Name = reader.GetString(1),
+                        Description = reader.GetString(2),
+                        Icon = reader.GetString(3),
+                        CategoryID = reader.GetInt32(4)
+                    };
+                }
             }
 
-            return null;
+            // Close the reader before another repository initializes its tables.
+            if (project is not null)
+            {
+                project.Tags = await _tagRepository.ListAsync(project.ID);
+                project.Tasks = await _taskRepository.ListAsync(project.ID);
+            }
+
+            return project;
         }
 
         /// <summary>
@@ -143,7 +148,26 @@ namespace HabitosNet.Data
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 
-            var saveCmd = connection.CreateCommand();
+            await using var transaction = connection.BeginTransaction();
+            if (item.CategoryID != 0)
+            {
+                using var checkCmd = connection.CreateCommand();
+                checkCmd.Transaction = transaction;
+                checkCmd.CommandText = "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'Category')";
+                var categoryExists = Convert.ToInt64(await checkCmd.ExecuteScalarAsync()) != 0;
+                if (categoryExists)
+                {
+                    checkCmd.CommandText = "SELECT EXISTS (SELECT 1 FROM Category WHERE ID = @categoryId)";
+                    checkCmd.Parameters.AddWithValue("@categoryId", item.CategoryID);
+                    categoryExists = Convert.ToInt64(await checkCmd.ExecuteScalarAsync()) != 0;
+                }
+
+                if (!categoryExists)
+                    throw new InvalidOperationException("La categoría seleccionada ya no existe. Selecciona otra categoría.");
+            }
+
+            using var saveCmd = connection.CreateCommand();
+            saveCmd.Transaction = transaction;
             if (item.ID == 0)
             {
                 saveCmd.CommandText = @"
@@ -166,6 +190,7 @@ namespace HabitosNet.Data
             saveCmd.Parameters.AddWithValue("@CategoryID", item.CategoryID);
 
             var result = await saveCmd.ExecuteScalarAsync();
+            await transaction.CommitAsync();
             if (item.ID == 0)
             {
                 item.ID = Convert.ToInt32(result);
@@ -175,21 +200,33 @@ namespace HabitosNet.Data
         }
 
         /// <summary>
-        /// Deletes a project from the database.
+        /// Deletes a project, its tasks, and its tag associations in one transaction.
         /// </summary>
         /// <param name="item">The project to delete.</param>
         /// <returns>The number of rows affected.</returns>
         public async Task<int> DeleteItemAsync(Project item)
         {
             await Init();
+            await _taskRepository.EnsureInitializedAsync();
+            await _tagRepository.EnsureInitializedAsync();
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 
-            var deleteCmd = connection.CreateCommand();
-            deleteCmd.CommandText = "DELETE FROM Project WHERE ID = @ID";
+            // Explicit cascading also protects databases created before foreign keys existed.
+            await using var transaction = connection.BeginTransaction();
+            using var deleteCmd = connection.CreateCommand();
+            deleteCmd.Transaction = transaction;
             deleteCmd.Parameters.AddWithValue("@ID", item.ID);
 
-            return await deleteCmd.ExecuteNonQueryAsync();
+            deleteCmd.CommandText = "DELETE FROM Task WHERE ProjectID = @ID";
+            await deleteCmd.ExecuteNonQueryAsync();
+            deleteCmd.CommandText = "DELETE FROM ProjectsTags WHERE ProjectID = @ID";
+            await deleteCmd.ExecuteNonQueryAsync();
+            deleteCmd.CommandText = "DELETE FROM Project WHERE ID = @ID";
+            var affectedProjects = await deleteCmd.ExecuteNonQueryAsync();
+
+            await transaction.CommitAsync();
+            return affectedProjects;
         }
 
         /// <summary>

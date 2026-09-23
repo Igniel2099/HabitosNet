@@ -1,177 +1,155 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HabitosNet.Models;
+using System.Globalization;
 
-namespace HabitosNet.PageModels
+namespace HabitosNet.PageModels;
+
+public partial class MainPageModel : ObservableObject, IProjectTaskPageModel
 {
-    public partial class MainPageModel : ObservableObject, IProjectTaskPageModel
+    private readonly ProjectRepository _projectRepository;
+    private readonly TaskRepository _taskRepository;
+    private readonly CategoryRepository _categoryRepository;
+    private readonly ModalErrorHandler _errorHandler;
+    private readonly SeedDataService _seedDataService;
+    private bool _dataLoaded;
+
+    [ObservableProperty] private List<CategoryChartData> _todoCategoryData = [];
+    [ObservableProperty] private List<Brush> _todoCategoryColors = [];
+    [ObservableProperty] private List<ProjectTask> _tasks = [];
+    [ObservableProperty] private List<ProjectTask> _visibleTasks = [];
+    [ObservableProperty] private List<Project> _projects = [];
+    [ObservableProperty] private bool _isBusy;
+    [ObservableProperty] private bool _isRefreshing;
+    [ObservableProperty] private bool _showCompleted;
+    [ObservableProperty] private string _today = string.Empty;
+
+    public int PendingCount => Tasks.Count(t => !t.IsCompleted);
+    public int CompletedCount => Tasks.Count(t => t.IsCompleted);
+    public int ProjectCount => Projects.Count;
+    public bool HasCompletedTasks => CompletedCount > 0;
+    public bool HasCategoryData => TodoCategoryData.Any(c => c.Count > 0);
+    public string TaskListHint => ShowCompleted ? "Todas tus tareas, en un solo lugar." : "Lo que queda por hacer. Marca cada tarea al terminar.";
+    public string EmptyMessage => Tasks.Count == 0 ? "Tu primera tarea empieza aquí" : "¡Todo al día!";
+    public string EmptyHint => Tasks.Count == 0 ? "Crea un proyecto y añade una tarea para empezar." : "No tienes tareas pendientes. Puedes consultar las completadas.";
+
+    public MainPageModel(SeedDataService seedDataService, ProjectRepository projectRepository,
+        TaskRepository taskRepository, CategoryRepository categoryRepository, ModalErrorHandler errorHandler)
     {
-        private bool _isNavigatedTo;
-        private bool _dataLoaded;
-        private readonly ProjectRepository _projectRepository;
-        private readonly TaskRepository _taskRepository;
-        private readonly CategoryRepository _categoryRepository;
-        private readonly ModalErrorHandler _errorHandler;
-        private readonly SeedDataService _seedDataService;
+        _projectRepository = projectRepository;
+        _taskRepository = taskRepository;
+        _categoryRepository = categoryRepository;
+        _errorHandler = errorHandler;
+        _seedDataService = seedDataService;
+    }
 
-        [ObservableProperty]
-        private List<CategoryChartData> _todoCategoryData = [];
+    partial void OnShowCompletedChanged(bool value) => UpdateSummary();
 
-        [ObservableProperty]
-        private List<Brush> _todoCategoryColors = [];
+    private void UpdateSummary()
+    {
+        VisibleTasks = Tasks.Where(t => ShowCompleted || !t.IsCompleted).OrderBy(t => t.IsCompleted).ToList();
+        foreach (var property in new[] { nameof(PendingCount), nameof(CompletedCount), nameof(ProjectCount),
+            nameof(HasCompletedTasks), nameof(TaskListHint), nameof(EmptyMessage), nameof(EmptyHint), nameof(HasCategoryData) })
+            OnPropertyChanged(property);
+    }
 
-        [ObservableProperty]
-        private List<ProjectTask> _tasks = [];
-
-        [ObservableProperty]
-        private List<Project> _projects = [];
-
-        [ObservableProperty]
-        bool _isBusy;
-
-        [ObservableProperty]
-        bool _isRefreshing;
-
-        [ObservableProperty]
-        private string _today = DateTime.Now.ToString("dddd, MMM d");
-
-        [ObservableProperty]
-        private Project? selectedProject;
-
-        public bool HasCompletedTasks
-            => Tasks?.Any(t => t.IsCompleted) ?? false;
-
-        public MainPageModel(SeedDataService seedDataService, ProjectRepository projectRepository,
-            TaskRepository taskRepository, CategoryRepository categoryRepository, ModalErrorHandler errorHandler)
+    private async Task LoadData()
+    {
+        Projects = await _projectRepository.ListAsync();
+        Tasks = await _taskRepository.ListAsync();
+        var categories = await _categoryRepository.ListAsync();
+        var chartData = new List<CategoryChartData>();
+        var chartColors = new List<Brush>();
+        foreach (var category in categories)
         {
-            _projectRepository = projectRepository;
-            _taskRepository = taskRepository;
-            _categoryRepository = categoryRepository;
-            _errorHandler = errorHandler;
-            _seedDataService = seedDataService;
+            int count = Projects.Where(p => p.CategoryID == category.ID).SelectMany(p => p.Tasks).Count(t => !t.IsCompleted);
+            if (count == 0) continue;
+            chartData.Add(new(category.Title, count));
+            chartColors.Add(category.ColorBrush);
         }
-
-        private async Task LoadData()
+        var knownCategories = categories.Select(c => c.ID).ToHashSet();
+        int uncategorized = Projects.Where(p => !knownCategories.Contains(p.CategoryID))
+            .SelectMany(p => p.Tasks).Count(t => !t.IsCompleted);
+        if (uncategorized > 0)
         {
-            try
-            {
-                IsBusy = true;
-
-                Projects = await _projectRepository.ListAsync();
-
-                var chartData = new List<CategoryChartData>();
-                var chartColors = new List<Brush>();
-
-                var categories = await _categoryRepository.ListAsync();
-                foreach (var category in categories)
-                {
-                    chartColors.Add(category.ColorBrush);
-
-                    var ps = Projects.Where(p => p.CategoryID == category.ID).ToList();
-                    int tasksCount = ps.SelectMany(p => p.Tasks).Count();
-
-                    chartData.Add(new(category.Title, tasksCount));
-                }
-
-                TodoCategoryData = chartData;
-                TodoCategoryColors = chartColors;
-
-                Tasks = await _taskRepository.ListAsync();
-            }
-            finally
-            {
-                IsBusy = false;
-                OnPropertyChanged(nameof(HasCompletedTasks));
-            }
+            chartData.Add(new("Sin categoría", uncategorized));
+            chartColors.Add(new SolidColorBrush(Color.FromArgb("#778DA0")));
         }
+        TodoCategoryData = chartData;
+        TodoCategoryColors = chartColors;
+        Today = DateTime.Today.ToString("dddd, d 'de' MMMM", CultureInfo.GetCultureInfo("es-ES"));
+        UpdateSummary();
+    }
 
-        private async Task InitData(SeedDataService seedDataService)
+    [RelayCommand]
+    private async Task Refresh()
+    {
+        if (IsBusy) return;
+        try
         {
-            bool isSeeded = Preferences.Default.ContainsKey("is_seeded");
-
-            if (!isSeeded)
-            {
-                await seedDataService.LoadSeedDataAsync();
-            }
-
-            Preferences.Default.Set("is_seeded", true);
-            await Refresh();
+            IsBusy = IsRefreshing = true;
+            await LoadData();
         }
+        catch (Exception ex) { _errorHandler.HandleError(ex); }
+        finally { IsBusy = IsRefreshing = false; }
+    }
 
-        [RelayCommand]
-        private async Task Refresh()
+    [RelayCommand]
+    private async Task Appearing()
+    {
+        if (IsBusy) return;
+        try
         {
-            try
-            {
-                IsRefreshing = true;
-                await LoadData();
-            }
-            catch (Exception e)
-            {
-                _errorHandler.HandleError(e);
-            }
-            finally
-            {
-                IsRefreshing = false;
-            }
-        }
-
-        [RelayCommand]
-        private void NavigatedTo() =>
-            _isNavigatedTo = true;
-
-        [RelayCommand]
-        private void NavigatedFrom() =>
-            _isNavigatedTo = false;
-
-        [RelayCommand]
-        private async Task Appearing()
-        {
+            IsBusy = true;
             if (!_dataLoaded)
             {
-                await InitData(_seedDataService);
+                if (!Preferences.Default.ContainsKey("is_seeded"))
+                {
+                    await _seedDataService.LoadSeedDataAsync();
+                    Preferences.Default.Set("is_seeded", true);
+                }
                 _dataLoaded = true;
-                await Refresh();
             }
-            // This means we are being navigated to
-            else if (!_isNavigatedTo)
-            {
-                await Refresh();
-            }
+            await LoadData();
         }
+        catch (Exception ex) { _errorHandler.HandleError(ex); }
+        finally { IsBusy = false; }
+    }
 
-        [RelayCommand]
-        private Task TaskCompleted(ProjectTask task)
+    [RelayCommand]
+    private async Task TaskCompleted(ProjectTask task)
+    {
+        try
         {
-            OnPropertyChanged(nameof(HasCompletedTasks));
-            return _taskRepository.SaveItemAsync(task);
+            await _taskRepository.SaveItemAsync(task);
         }
-
-        [RelayCommand]
-        private Task AddTask()
-            => Shell.Current.GoToAsync($"task");
-
-        [RelayCommand]
-        private Task? NavigateToProject(Project project)
-            => project is null ? null : Shell.Current.GoToAsync($"project?id={project.ID}");
-
-        [RelayCommand]
-        private Task NavigateToTask(ProjectTask task)
-            => Shell.Current.GoToAsync($"task?id={task.ID}");
-
-        [RelayCommand]
-        private async Task CleanTasks()
+        catch (Exception ex)
         {
-            var completedTasks = Tasks.Where(t => t.IsCompleted).ToList();
-            foreach (var task in completedTasks)
-            {
+            task.IsCompleted = !task.IsCompleted;
+            UpdateSummary();
+            _errorHandler.HandleError(ex);
+            return;
+        }
+        await Refresh();
+    }
+
+    [RelayCommand] private Task AddTask() => Shell.Current.GoToAsync("task");
+    [RelayCommand] private Task AddProject() => Shell.Current.GoToAsync("project");
+    [RelayCommand] private Task ShowProjects() => Shell.Current.GoToAsync("//projects");
+    [RelayCommand] private Task NavigateToTask(ProjectTask task) => Shell.Current.GoToAsync($"task?id={task.ID}");
+
+    [RelayCommand]
+    private async Task CleanTasks()
+    {
+        if (!await Shell.Current.DisplayAlertAsync("Eliminar tareas completadas",
+            "Se eliminarán las tareas completadas de todos los proyectos. Esta acción no se puede deshacer.", "Eliminar", "Cancelar")) return;
+        try
+        {
+            foreach (var task in Tasks.Where(t => t.IsCompleted).ToList())
                 await _taskRepository.DeleteItemAsync(task);
-                Tasks.Remove(task);
-            }
-
-            OnPropertyChanged(nameof(HasCompletedTasks));
-            Tasks = new(Tasks);
-            await AppShell.DisplayToastAsync("All cleaned up!");
+            await LoadData();
+            await AppShell.DisplayToastAsync("Tareas completadas eliminadas");
         }
+        catch (Exception ex) { _errorHandler.HandleError(ex); }
     }
 }

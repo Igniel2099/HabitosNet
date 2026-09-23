@@ -29,7 +29,7 @@
     <OnIdiom x:Key="IconSize"
              x:TypeArguments="x:Double"
              Default="20">
-        <OnIdiom.Desktop>32</OnIdiom.Desktop>
+        <OnIdiom.Desktop>24</OnIdiom.Desktop>
     </OnIdiom>
     
     <OnIdiom x:Key="IconSizeSmall"
@@ -40,14 +40,14 @@
 
     <OnIdiom x:Key="LayoutPadding"
              x:TypeArguments="Thickness"
-             Default="15">
-        <OnIdiom.Desktop>30</OnIdiom.Desktop>
+             Default="16">
+        <OnIdiom.Desktop>24</OnIdiom.Desktop>
     </OnIdiom>
 
     <OnIdiom x:Key="LayoutSpacing"
              x:TypeArguments="x:Double"
-             Default="5">
-        <OnIdiom.Desktop>15</OnIdiom.Desktop>
+             Default="16">
+        <OnIdiom.Desktop>20</OnIdiom.Desktop>
     </OnIdiom>
 
     <FontImageSource x:Key="IconDashboard"
@@ -109,7 +109,7 @@
         <Setter Property="BackgroundColor"
                 Value="Transparent" />
         <Setter Property="FontSize"
-                Value="17" />
+                Value="16" />
         <Setter Property="LineHeight"
                 Value="1.29" />
         <!-- 22 -->
@@ -285,4 +285,62 @@
         <Setter Property="ProgressColor" Value="{StaticResource Primary}"/>
     </Style>
 
+    <Style x:Key="PageTitle" TargetType="Label">
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+        <Setter Property="FontSize" Value="28" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="SemanticProperties.HeadingLevel" Value="Level1" />
+    </Style>
+    <Style x:Key="SectionTitle" TargetType="Label">
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="SemanticProperties.HeadingLevel" Value="Level2" />
+    </Style>
+    <Style x:Key="MutedLabel" TargetType="Label">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource MutedLight}, Dark={StaticResource MutedDark}}" />
+    </Style>
+    <Style x:Key="FormCard" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}" />
+        <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource OutlineLight}, Dark={StaticResource OutlineDark}}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 16" />
+        <Setter Property="Padding" Value="20" />
+    </Style>
+    <Style x:Key="PrimaryButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+        <Setter Property="TextColor" Value="White" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="MinimumHeightRequest" Value="48" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="20,12" />
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="Opacity" Value="0.5" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Property="Opacity" Value="0.85" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+    <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" />
+        <Setter Property="BorderColor" Value="{AppThemeBinding Light={StaticResource OutlineLight}, Dark={StaticResource OutlineDark}}" />
+        <Setter Property="BorderWidth" Value="1" />
+    </Style>
+    <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource DangerLight}, Dark={StaticResource DangerDark}}" />
+    </Style>
 </ResourceDictionary>

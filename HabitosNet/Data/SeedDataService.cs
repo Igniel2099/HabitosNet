@@ -24,11 +24,9 @@ namespace HabitosNet.Data
 
         public async Task LoadSeedDataAsync()
         {
-            ClearTables();
-
             await using Stream templateStream = await FileSystem.OpenAppPackageFileAsync(_seedDataFilePath);
 
-            ProjectsJson? payload = null;
+            ProjectsJson? payload;
             try
             {
                 payload = JsonSerializer.Deserialize(templateStream, JsonContext.Default.ProjectsJson);
@@ -36,7 +34,19 @@ namespace HabitosNet.Data
             catch (Exception e)
             {
                 _logger.LogError(e, "Error deserializing seed data");
+                throw new InvalidOperationException("No se han podido leer los datos de ejemplo. Tus datos se han conservado.", e);
             }
+
+            if (payload?.Projects is not { Count: > 0 } || payload.Projects.Any(project =>
+                project is null || string.IsNullOrWhiteSpace(project.Name) || project.Description is null || project.Icon is null ||
+                project.Tasks is null || project.Tasks.Any(task => task is null || string.IsNullOrWhiteSpace(task.Title)) ||
+                project.Tags is null || project.Tags.Any(tag => tag is null || string.IsNullOrWhiteSpace(tag.Title) || tag.Color is null) ||
+                (project.Category is not null && (string.IsNullOrWhiteSpace(project.Category.Title) || project.Category.Color is null))))
+            {
+                throw new InvalidOperationException("Los datos de ejemplo no son válidos. Tus datos se han conservado.");
+            }
+
+            await ClearTablesAsync();
 
             try
             {
@@ -83,20 +93,11 @@ namespace HabitosNet.Data
             }
         }
 
-        private async void ClearTables()
+        private async Task ClearTablesAsync()
         {
-            try
-            {
-                await Task.WhenAll(
-                    _projectRepository.DropTableAsync(),
-                    _taskRepository.DropTableAsync(),
-                    _tagRepository.DropTableAsync(),
-                    _categoryRepository.DropTableAsync());
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-            }
+            // ProjectRepository also clears tasks and tags; wait before recreating any table.
+            await _projectRepository.DropTableAsync();
+            await _categoryRepository.DropTableAsync();
         }
     }
 }

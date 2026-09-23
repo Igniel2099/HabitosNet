@@ -24,7 +24,7 @@ namespace HabitosNet.Data
         /// <summary>
         /// Initializes the database connection and creates the Tag and ProjectsTags tables if they do not exist.
         /// </summary>
-        private async Task Init()
+        internal async Task EnsureInitializedAsync()
         {
             if (_hasBeenInitialized)
                 return;
@@ -66,7 +66,7 @@ namespace HabitosNet.Data
         /// <returns>A list of <see cref="Tag"/> objects.</returns>
         public async Task<List<Tag>> ListAsync()
         {
-            await Init();
+            await EnsureInitializedAsync();
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 
@@ -95,7 +95,7 @@ namespace HabitosNet.Data
         /// <returns>A list of <see cref="Tag"/> objects.</returns>
         public async Task<List<Tag>> ListAsync(int projectID)
         {
-            await Init();
+            await EnsureInitializedAsync();
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 
@@ -130,7 +130,7 @@ namespace HabitosNet.Data
         /// <returns>A <see cref="Tag"/> object if found; otherwise, null.</returns>
         public async Task<Tag?> GetAsync(int id)
         {
-            await Init();
+            await EnsureInitializedAsync();
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 
@@ -159,7 +159,7 @@ namespace HabitosNet.Data
         /// <returns>The ID of the saved tag.</returns>
         public async Task<int> SaveItemAsync(Tag item)
         {
-            await Init();
+            await EnsureInitializedAsync();
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 
@@ -197,7 +197,7 @@ namespace HabitosNet.Data
         /// <returns>The number of rows affected.</returns>
         public async Task<int> SaveItemAsync(Tag item, int projectID)
         {
-            await Init();
+            await EnsureInitializedAsync();
             await SaveItemAsync(item);
 
             var isAssociated = await IsAssociated(item, projectID);
@@ -226,7 +226,7 @@ namespace HabitosNet.Data
         /// <returns>If tag is already associated with this project</returns>
         async Task<bool> IsAssociated(Tag item, int projectID)
         {
-            await Init();
+            await EnsureInitializedAsync();
 
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
@@ -251,7 +251,7 @@ namespace HabitosNet.Data
         /// <returns>The number of rows affected.</returns>
         public async Task<int> DeleteItemAsync(Tag item)
         {
-            await Init();
+            await EnsureInitializedAsync();
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 
@@ -270,7 +270,7 @@ namespace HabitosNet.Data
         /// <returns>The number of rows affected.</returns>
         public async Task<int> DeleteItemAsync(Tag item, int projectID)
         {
-            await Init();
+            await EnsureInitializedAsync();
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 
@@ -287,7 +287,7 @@ namespace HabitosNet.Data
         /// </summary>
         public async Task DropTableAsync()
         {
-            await Init();
+            await EnsureInitializedAsync();
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 

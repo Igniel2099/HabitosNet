@@ -3,188 +3,152 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:HabitosNet.PageModels"
              xmlns:models="clr-namespace:HabitosNet.Models"
-             xmlns:pages="clr-namespace:HabitosNet.Pages"
-             xmlns:sf="clr-namespace:Syncfusion.Maui.Toolkit.TextInputLayout;assembly=Syncfusion.Maui.Toolkit"
              xmlns:controls="clr-namespace:HabitosNet.Pages.Controls"
              xmlns:fonts="clr-namespace:Fonts"
              x:Class="HabitosNet.Pages.ProjectDetailPage"
              x:DataType="pageModels:ProjectDetailPageModel"
-             Title="Project">
-
-    <ContentPage.ToolbarItems>
-        <ToolbarItem
-            Text="Delete"
-            Command="{Binding DeleteCommand}"
-            Order="Primary"
-            Priority="0"
-            IconImageSource="{StaticResource IconDelete}"
-            SemanticProperties.Description="Delete Project" />
-    </ContentPage.ToolbarItems>
-
-    <Grid>
-        <ScrollView>
-            <VerticalStackLayout Padding="{StaticResource LayoutPadding}" Spacing="{StaticResource LayoutSpacing}">
-                <sf:SfTextInputLayout 
-                    Hint="Name" >
-                    <Entry
-                        Text="{Binding Name}" SemanticProperties.Description="Name" />
-                </sf:SfTextInputLayout>
-
-                <sf:SfTextInputLayout 
-                    Hint="Description">
-                    <Entry
-                        Text="{Binding Description}" SemanticProperties.Description="Description" />
-                </sf:SfTextInputLayout>
-
-               <sf:SfTextInputLayout
-                    Hint="Category"
-                    SemanticProperties.Description="ComboBox to Select Category"
-                    SemanticProperties.Hint="State Collapsed">
-                    <Picker SemanticProperties.Hint="Select the category for the project"
-                            ItemsSource="{Binding Categories}"
-                            SelectedItem="{Binding Category}"
-                            SelectedIndex="{Binding CategoryIndex}"
-                            SemanticProperties.Description="Category State Expanded"/>
-                </sf:SfTextInputLayout>
-
-                <Label 
-                    Text="Icon" 
-                    Style="{StaticResource Title2}"/>
-                <CollectionView 
-                    HeightRequest="44" Margin="0,0,0,15"
-                    SelectionMode="Single" 
-                    SelectedItem="{Binding Icon}"
-                    SelectionChangedCommand="{Binding IconSelectedCommand}"
-                    SelectionChangedCommandParameter="{Binding Icon}"
-                    ItemsSource="{Binding Icons}">
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate x:DataType="models:IconData">
-                            <Grid RowDefinitions="Auto,4" RowSpacing="{StaticResource size60}"
-                                 SemanticProperties.Description="{Binding Description}">
-                                <VisualStateManager.VisualStateGroups>
-                                    <VisualStateGroup x:Name="CommonStates">
-                                        <VisualState x:Name="Normal">
-                                            <VisualState.Setters>
-                                                <Setter Property="BackgroundColor" Value="Transparent"/>
-                                                <Setter TargetName="SelectedIndicator" Property="BoxView.IsVisible" Value="False"/>
-                                            </VisualState.Setters>
-                                        </VisualState>
-                                        <VisualState x:Name="Selected">
-                                            <VisualState.Setters>
-                                                <Setter Property="BackgroundColor" Value="Transparent"/>
-                                                <Setter Property="Background" Value="Transparent"/>
-                                                <Setter TargetName="SelectedIndicator" Property="BoxView.IsVisible" Value="True"/>
-                                            </VisualState.Setters>
-                                        </VisualState>
-                                    </VisualStateGroup>
-                                </VisualStateManager.VisualStateGroups>
-                                
-                                <Label 
-                                    Text="{Binding Icon}"
-                                    x:Name="IconImage"
-                                    FontFamily="{x:Static fonts:FluentUI.FontFamily}" 
-                                    FontSize="24" 
-                                    VerticalOptions="Center"
-                                    HorizontalOptions="Center"
-                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground},Dark={StaticResource LightOnDarkBackground}}"/>
-                                <BoxView x:Name="SelectedIndicator" Color="{StaticResource Primary}" HeightRequest="4" HorizontalOptions="Fill" Grid.Row="1"/>
-                            </Grid>                            
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                    <CollectionView.ItemsLayout>
-                        <LinearItemsLayout Orientation="Horizontal" ItemSpacing="{StaticResource LayoutSpacing}"/>
-                    </CollectionView.ItemsLayout>
-                </CollectionView>
-                
-
-                <Label 
-                    Text="Tags" 
-                    Style="{StaticResource Title2}"/>
-
-                <CollectionView
-                    ItemsSource="{Binding AllTags}"
-                    SelectionMode="Multiple"
-                    HeightRequest="44"
-                    Margin="0,0,0,15"
-                    SelectedItems="{Binding SelectedTags, Mode=TwoWay}"
-                    SelectionChangedCommand="{Binding SelectionChangedCommand}"
-                    SelectionChangedCommandParameter="{Binding SelectedTags}"
-                    SemanticProperties.Description="Tags Collection">
-                    <CollectionView.ItemsLayout>
-                        <LinearItemsLayout Orientation="Horizontal" ItemSpacing="{StaticResource LayoutSpacing}" />
-                    </CollectionView.ItemsLayout>
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate x:DataType="models:Tag">
-                            <Border StrokeShape="RoundRectangle 22" 
-                                HeightRequest="44" 
-                                VerticalOptions="Center"
-                                Padding="{OnPlatform '18,0,18,8',Android='18,0,18,0'}"
-                                SemanticProperties.Description="{Binding Title}">
-                                <VisualStateManager.VisualStateGroups>
-                                    <VisualStateGroup x:Name="CommonStates">
-                                        <VisualState x:Name="Normal">
-                                            <VisualState.Setters>
-                                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource LightSecondaryBackground},Dark={StaticResource DarkSecondaryBackground}}"/>
-                                                <Setter TargetName="TagLabel" Property="Label.TextColor" Value="{AppThemeBinding Light={StaticResource DarkOnLightBackground},Dark={StaticResource LightOnDarkBackground}}"/>
-                                            </VisualState.Setters>
-                                        </VisualState>
-                                        <VisualState x:Name="Selected">
-                                            <VisualState.Setters>
-                                                <Setter Property="BackgroundColor" Value="{Binding DisplayColor}"/>
-                                                <Setter TargetName="TagLabel" Property="Label.TextColor" Value="{AppThemeBinding Light={StaticResource LightBackground},Dark={StaticResource DarkBackground}}"/>
-                                            </VisualState.Setters>
-                                        </VisualState>
-                                    </VisualStateGroup>
-                                </VisualStateManager.VisualStateGroups>
-                                <Label x:Name="TagLabel"
-                                    Text="{Binding Title}"
-                                    TextColor="{AppThemeBinding Light={StaticResource LightBackground},Dark={StaticResource DarkBackground}}" 
-                                    FontSize="{OnIdiom 16,Desktop=18}" 
-                                    VerticalOptions="Center"
-                                    VerticalTextAlignment="Center">
-                                </Label>
-                            </Border>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                </CollectionView>
-                
-
-                <Button Text="Save" 
-                    MinimumHeightRequest="{OnIdiom 44, Desktop=60}"
-                    Command="{Binding SaveCommand}" />
-
-                <Grid HeightRequest="44">
-                    <Label 
-                        Text="Tasks" 
-                        Style="{StaticResource Title2}" 
-                        VerticalOptions="Center"/>
-                    <ImageButton 
-                        Source="{StaticResource IconClean}"
-                        HorizontalOptions="End"
-                        VerticalOptions="Center"
-                        Aspect="Center"
-                        HeightRequest="44"
-                        WidthRequest="44"
-                        IsVisible="{Binding HasCompletedTasks}"
-                        Command="{Binding CleanTasksCommand}"
-                        SemanticProperties.Description="Clean up"
-                        />
-                </Grid>
-                <VerticalStackLayout 
-                    Spacing="{StaticResource LayoutSpacing}"
-                    BindableLayout.ItemsSource="{Binding Tasks}">
-                    <BindableLayout.ItemTemplate>
-                        <DataTemplate>
-                            <controls:TaskView TaskCompletedCommand="{Binding TaskCompletedCommand, Source={RelativeSource AncestorType={x:Type pageModels:ProjectDetailPageModel}}, x:DataType=pageModels:ProjectDetailPageModel}" />
-                        </DataTemplate>
-                    </BindableLayout.ItemTemplate>
-                </VerticalStackLayout>
+             Title="Proyecto"
+             SizeChanged="OnPageSizeChanged">
+    <ScrollView x:Name="PageScroll" Padding="16">
+        <VerticalStackLayout x:Name="FormLayout" MaximumWidthRequest="920"
+                             HorizontalOptions="Center" Spacing="20">
+            <VerticalStackLayout Spacing="6">
+                <Label Text="Tu proyecto" Style="{StaticResource PageTitle}" />
+                <Label Text="Define lo que quieres conseguir y divídelo en tareas."
+                       Style="{StaticResource MutedLabel}" />
             </VerticalStackLayout>
-        </ScrollView>
 
-        <controls:AddButton Command="{Binding AddTaskCommand}" 
-                            SemanticProperties.Description="Add task" 
-                            ToolTipProperties.Text="Add task" />
-    </Grid>
-    
+            <Label Text="{Binding ValidationMessage}" IsVisible="{Binding HasValidationMessage}"
+                   TextColor="{AppThemeBinding Light=#B42318, Dark=#FDA29B}" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
+                               Color="{StaticResource Primary}" SemanticProperties.Description="Guardando o cargando proyecto" />
+
+            <Grid x:Name="DetailsGrid" RowDefinitions="Auto,Auto" ColumnDefinitions="*,0"
+                  ColumnSpacing="0" RowSpacing="16" IsEnabled="{Binding CanSave}">
+                <Border x:Name="DetailsCard" Style="{StaticResource FormCard}" VerticalOptions="Start">
+                    <VerticalStackLayout Spacing="16">
+                        <Label Text="Detalles" Style="{StaticResource SectionTitle}" />
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="Nombre del proyecto *" FontAttributes="Bold" />
+                            <Entry Text="{Binding Name}" Placeholder="Ej. Aprender un idioma"
+                                   ReturnType="Next" SemanticProperties.Description="Nombre del proyecto, obligatorio" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="Descripción" FontAttributes="Bold" />
+                            <Editor Text="{Binding Description}" Placeholder="¿Qué quieres conseguir?"
+                                    AutoSize="TextChanges" MinimumHeightRequest="112"
+                                    SemanticProperties.Description="Descripción opcional del proyecto" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="Categoría (opcional)" FontAttributes="Bold" />
+                            <Picker Title="Selecciona una categoría"
+                                    ItemsSource="{Binding Categories}"
+                                    ItemDisplayBinding="{Binding Title, x:DataType=models:Category}"
+                                    SelectedItem="{Binding Category}" SelectedIndex="{Binding CategoryIndex}"
+                                    SemanticProperties.Description="Categoría del proyecto" />
+                            <Label Text="Puedes crear categorías en Categorías y etiquetas."
+                                   Style="{StaticResource MutedLabel}" />
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border x:Name="OrganizationCard" Grid.Row="1" Style="{StaticResource FormCard}" VerticalOptions="Start">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="Personaliza tu proyecto" Style="{StaticResource SectionTitle}" />
+                        <Label Text="Icono" FontAttributes="Bold" />
+                        <CollectionView HeightRequest="128" SelectionMode="Single"
+                                        SelectedItem="{Binding Icon}"
+                                        SelectionChangedCommand="{Binding IconSelectedCommand}"
+                                        SelectionChangedCommandParameter="{Binding Icon}"
+                                        ItemsSource="{Binding Icons}"
+                                        SemanticProperties.Description="Elige un icono para el proyecto">
+                            <CollectionView.ItemsLayout>
+                                <GridItemsLayout Orientation="Vertical" Span="4" HorizontalItemSpacing="8" VerticalItemSpacing="8" />
+                            </CollectionView.ItemsLayout>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="models:IconData">
+                                    <Grid HeightRequest="56" MinimumWidthRequest="48" RowDefinitions="*,4"
+                                          SemanticProperties.Description="{Binding Description}">
+                                        <VisualStateManager.VisualStateGroups>
+                                            <VisualStateGroup x:Name="CommonStates">
+                                                <VisualState x:Name="Normal">
+                                                    <VisualState.Setters>
+                                                        <Setter Property="BackgroundColor" Value="Transparent" />
+                                                        <Setter TargetName="SelectedIndicator" Property="BoxView.IsVisible" Value="False" />
+                                                    </VisualState.Setters>
+                                                </VisualState>
+                                                <VisualState x:Name="Selected">
+                                                    <VisualState.Setters>
+                                                        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#DCF5EF, Dark=#173F3A}" />
+                                                        <Setter TargetName="SelectedIndicator" Property="BoxView.IsVisible" Value="True" />
+                                                    </VisualState.Setters>
+                                                </VisualState>
+                                            </VisualStateGroup>
+                                        </VisualStateManager.VisualStateGroups>
+                                        <Label Text="{Binding Icon}" FontFamily="{x:Static fonts:FluentUI.FontFamily}"
+                                               FontSize="26" VerticalOptions="Center" HorizontalOptions="Center" />
+                                        <BoxView x:Name="SelectedIndicator" Grid.Row="1" Color="{StaticResource Primary}"
+                                                 HeightRequest="4" />
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+
+                        <Label Text="Etiquetas" FontAttributes="Bold" />
+                        <Label Text="Toca una etiqueta para seleccionarla o quitarla. Son opcionales."
+                               Style="{StaticResource MutedLabel}" />
+                        <FlexLayout Wrap="Wrap" Direction="Row" AlignItems="Start"
+                                    BindableLayout.ItemsSource="{Binding AllTags}">
+                            <BindableLayout.EmptyView>
+                                <Label Text="Aún no hay etiquetas. Puedes crearlas en Categorías y etiquetas."
+                                       Style="{StaticResource MutedLabel}" />
+                            </BindableLayout.EmptyView>
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:Tag">
+                                    <Button Text="{Binding Title}" Margin="0,0,8,8" Style="{StaticResource SecondaryButton}"
+                                            LineBreakMode="WordWrap" FlexLayout.Shrink="1"
+                                            Command="{Binding ToggleTagCommand, Source={RelativeSource AncestorType={x:Type pageModels:ProjectDetailPageModel}}, x:DataType=pageModels:ProjectDetailPageModel}"
+                                            CommandParameter="{Binding .}">
+                                        <Button.Triggers>
+                                            <DataTrigger TargetType="Button" Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                                                <Setter Property="TextColor" Value="White" />
+                                            </DataTrigger>
+                                        </Button.Triggers>
+                                    </Button>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </FlexLayout>
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+            <Button Text="Guardar proyecto" Command="{Binding SaveCommand}" IsEnabled="{Binding CanSave}"
+                    Style="{StaticResource PrimaryButton}" />
+
+            <Border Style="{StaticResource FormCard}" IsEnabled="{Binding CanSave}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Tareas del proyecto" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Marca lo que ya has hecho. Pulsa Editar para cambiar una tarea."
+                           Style="{StaticResource MutedLabel}" />
+                    <Button Text="+ Añadir tarea" Command="{Binding AddTaskCommand}" Style="{StaticResource SecondaryButton}" />
+                    <VerticalStackLayout Spacing="10" BindableLayout.ItemsSource="{Binding Tasks}">
+                        <BindableLayout.EmptyView>
+                            <Label Text="Todavía no hay tareas. Añade el primer paso de tu proyecto."
+                                   Style="{StaticResource MutedLabel}" Margin="0,8" />
+                        </BindableLayout.EmptyView>
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="models:ProjectTask">
+                                <controls:TaskView TaskCompletedCommand="{Binding TaskCompletedCommand, Source={RelativeSource AncestorType={x:Type pageModels:ProjectDetailPageModel}}, x:DataType=pageModels:ProjectDetailPageModel}" />
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                    <Button Text="Eliminar tareas completadas" Command="{Binding CleanTasksCommand}"
+                            IsVisible="{Binding HasCompletedTasks}" Style="{StaticResource DangerButton}" />
+                </VerticalStackLayout>
+            </Border>
+            <Button Text="Eliminar proyecto" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}"
+                    Style="{StaticResource DangerButton}" IsEnabled="{Binding CanSave}" />
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>

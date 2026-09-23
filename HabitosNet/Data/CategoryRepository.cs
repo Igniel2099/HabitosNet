@@ -149,7 +149,7 @@ namespace HabitosNet.Data
         }
 
         /// <summary>
-        /// Deletes a category from the database.
+        /// Deletes an unused category from the database.
         /// </summary>
         /// <param name="item">The category to delete.</param>
         /// <returns>The number of rows affected.</returns>
@@ -159,11 +159,28 @@ namespace HabitosNet.Data
             await using var connection = new SqliteConnection(Constants.DatabasePath);
             await connection.OpenAsync();
 
-            var deleteCmd = connection.CreateCommand();
+            // The write transaction prevents another connection assigning this category
+            // between the usage check and the deletion.
+            await using var transaction = connection.BeginTransaction();
+            using var checkCmd = connection.CreateCommand();
+            checkCmd.Transaction = transaction;
+            checkCmd.CommandText = "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'Project')";
+            if (Convert.ToInt64(await checkCmd.ExecuteScalarAsync()) != 0)
+            {
+                checkCmd.CommandText = "SELECT EXISTS (SELECT 1 FROM Project WHERE CategoryID = @id)";
+                checkCmd.Parameters.AddWithValue("@id", item.ID);
+                if (Convert.ToInt64(await checkCmd.ExecuteScalarAsync()) != 0)
+                    throw new InvalidOperationException("Esta categoría está en uso. Reasigna sus proyectos antes de eliminarla.");
+            }
+
+            using var deleteCmd = connection.CreateCommand();
+            deleteCmd.Transaction = transaction;
             deleteCmd.CommandText = "DELETE FROM Category WHERE ID = @id";
             deleteCmd.Parameters.AddWithValue("@id", item.ID);
 
-            return await deleteCmd.ExecuteNonQueryAsync();
+            var affectedCategories = await deleteCmd.ExecuteNonQueryAsync();
+            await transaction.CommitAsync();
+            return affectedCategories;
         }
 
         /// <summary>

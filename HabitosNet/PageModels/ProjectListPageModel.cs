@@ -1,40 +1,55 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using HabitosNet.Data;
 using HabitosNet.Models;
-using HabitosNet.Services;
 
-namespace HabitosNet.PageModels
+namespace HabitosNet.PageModels;
+
+public partial class ProjectListPageModel : ObservableObject
 {
-    public partial class ProjectListPageModel : ObservableObject
+    private readonly ProjectRepository _projectRepository;
+    private readonly ModalErrorHandler _errorHandler;
+    private List<Project> _allProjects = [];
+
+    [ObservableProperty] private List<Project> _projects = [];
+    [ObservableProperty] private string _searchText = string.Empty;
+    [ObservableProperty] private bool _isBusy;
+
+    public string ResultSummary => $"{Projects.Count} proyecto{(Projects.Count == 1 ? "" : "s")}";
+    public string EmptyTitle => string.IsNullOrWhiteSpace(SearchText) ? "Dale forma a tu próximo objetivo" : "No hay coincidencias";
+    public string EmptyDescription => string.IsNullOrWhiteSpace(SearchText)
+        ? "Crea un proyecto y divídelo en tareas pequeñas." : "Prueba con otro nombre o borra la búsqueda.";
+
+    public ProjectListPageModel(ProjectRepository projectRepository, ModalErrorHandler errorHandler)
     {
-        private readonly ProjectRepository _projectRepository;
-
-        [ObservableProperty]
-        private List<Project> _projects = [];
-
-        [ObservableProperty]
-        private Project? selectedProject;
-
-        public ProjectListPageModel(ProjectRepository projectRepository)
-        {
-            _projectRepository = projectRepository;
-        }
-
-        [RelayCommand]
-        private async Task Appearing()
-        {
-            Projects = await _projectRepository.ListAsync();
-        }
-
-        [RelayCommand]
-        Task? NavigateToProject(Project project)
-            => project is null ? Task.CompletedTask : Shell.Current.GoToAsync($"project?id={project.ID}");
-
-        [RelayCommand]
-        async Task AddProject()
-        {
-            await Shell.Current.GoToAsync($"project");
-        }
+        _projectRepository = projectRepository;
+        _errorHandler = errorHandler;
     }
+
+    partial void OnSearchTextChanged(string value) => FilterProjects();
+
+    private void FilterProjects()
+    {
+        var term = (SearchText ?? string.Empty).Trim();
+        Projects = _allProjects.Where(p => p.Name.Contains(term, StringComparison.CurrentCultureIgnoreCase)
+            || p.Description.Contains(term, StringComparison.CurrentCultureIgnoreCase)).ToList();
+        OnPropertyChanged(nameof(ResultSummary));
+        OnPropertyChanged(nameof(EmptyTitle));
+        OnPropertyChanged(nameof(EmptyDescription));
+    }
+
+    [RelayCommand]
+    private async Task Appearing()
+    {
+        try
+        {
+            IsBusy = true;
+            _allProjects = await _projectRepository.ListAsync();
+            FilterProjects();
+        }
+        catch (Exception ex) { _errorHandler.HandleError(ex); }
+        finally { IsBusy = false; }
+    }
+
+    [RelayCommand] private Task NavigateToProject(Project project) => Shell.Current.GoToAsync($"project?id={project.ID}");
+    [RelayCommand] private Task AddProject() => Shell.Current.GoToAsync("project");
 }

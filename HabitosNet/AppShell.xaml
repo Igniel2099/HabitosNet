@@ -3,53 +3,22 @@
     x:Class="HabitosNet.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:sf="clr-namespace:Syncfusion.Maui.Toolkit.SegmentedControl;assembly=Syncfusion.Maui.Toolkit"
-    xmlns:pages="clr-namespace:HabitosNet.Pages"
-    Shell.FlyoutBehavior="Flyout"
-    FlyoutWidth="240"
-    SizeChanged="OnShellSizeChanged"
+    xmlns:views="clr-namespace:HabitosNet.Views"
     Title="HabitosNet">
 
-    <ShellContent
-        Title="Inicio"
-        Icon="{StaticResource IconDashboard}"
-        ContentTemplate="{DataTemplate pages:MainPage}"
-        Route="main" />
-
-    <ShellContent
-        Title="Proyectos"
-        Icon="{StaticResource IconProjects}"
-        ContentTemplate="{DataTemplate pages:ProjectListPage}"
-        Route="projects" />
-
-    <ShellContent
-        Title="Categorías y etiquetas"
-        Icon="{StaticResource IconMeta}"
-        ContentTemplate="{DataTemplate pages:ManageMetaPage}"
-        Route="manage" />
-
-    <Shell.FlyoutFooter>
-        <VerticalStackLayout Padding="20" Spacing="12">
-            <Label Text="Apariencia" Style="{StaticResource MutedLabel}" />
-            <sf:SfSegmentedControl x:Name="ThemeSegmentedControl" 
-                VerticalOptions="Center" HorizontalOptions="Center" SelectionChanged="SfSegmentedControl_SelectionChanged"
-                SegmentWidth="64" SegmentHeight="48">
-                <sf:SfSegmentedControl.ItemsSource>
-                    <x:Array Type="{x:Type sf:SfSegmentItem}">
-                        <sf:SfSegmentItem ImageSource="{StaticResource IconLight}" SemanticProperties.Description="Tema claro"/>
-                        <sf:SfSegmentItem ImageSource="{StaticResource IconDark}" SemanticProperties.Description="Tema oscuro"/>
-                    </x:Array>
-                </sf:SfSegmentedControl.ItemsSource>
-            </sf:SfSegmentedControl>
-            <Label Text="HabitosNet · Tus objetivos, paso a paso" Style="{StaticResource MutedLabel}" />
-        </VerticalStackLayout>
-    </Shell.FlyoutFooter>
-
-    <Shell.FlyoutHeader>
-        <VerticalStackLayout Padding="24,32,24,24" Spacing="4">
-            <Label Text="HabitosNet" FontSize="24" FontAttributes="Bold" />
-            <Label Text="Haz espacio para tus objetivos" Style="{StaticResource MutedLabel}" />
-        </VerticalStackLayout>
-    </Shell.FlyoutHeader>
+    <TabBar>
+        <ShellContent
+            Title="Home"
+            ContentTemplate="{DataTemplate views:HomePage}"
+            Route="home" />
+        <ShellContent
+            Title="Estudiar"
+            ContentTemplate="{DataTemplate views:StudyPage}"
+            Route="estudiar" />
+        <ShellContent
+            Title="Histórico"
+            ContentTemplate="{DataTemplate views:HistoryPage}"
+            Route="historico" />
+    </TabBar>
 
 </Shell>

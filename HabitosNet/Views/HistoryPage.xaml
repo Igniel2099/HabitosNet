@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:vm="clr-namespace:HabitosNet.ViewModels"
+             x:Class="HabitosNet.Views.HistoryPage"
+             x:DataType="vm:HistoryViewModel"
+             Title="Histórico">
+    <Grid RowDefinitions="Auto,*" Padding="16" RowSpacing="10">
+
+        <!-- Navegación de semana -->
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" VerticalOptions="Center">
+            <Button Text="◀"
+                    Command="{Binding PrevWeekCommand}"
+                    IsEnabled="{Binding CanGoPrev}" />
+            <Label Text="{Binding CurrentWeek.Title}"
+                   FontAttributes="Bold"
+                   FontSize="18"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"
+                   Grid.Column="1" />
+            <Button Text="▶"
+                    Command="{Binding NextWeekCommand}"
+                    IsEnabled="{Binding CanGoNext}"
+                    Grid.Column="2" />
+        </Grid>
+
+        <!-- Acordeón de los 7 días -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="10"
+                                 BindableLayout.ItemsSource="{Binding CurrentWeek.Days}">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DaySummaryItem">
+                        <toolkit:Expander IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
+                            <toolkit:Expander.Header>
+                                <Border StrokeShape="RoundRectangle 12" Padding="12">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10"
+                                          VerticalOptions="Center">
+                                        <Label Text="{Binding DayName}"
+                                               FontAttributes="Bold"
+                                               FontSize="16"
+                                               VerticalOptions="Center" />
+                                        <Label Text="{Binding QuickSummary}"
+                                               FontSize="13"
+                                               VerticalOptions="Center"
+                                               Grid.Column="1" />
+                                        <Label Text="▼"
+                                               FontSize="14"
+                                               VerticalOptions="Center"
+                                               Grid.Column="2">
+                                            <Label.Triggers>
+                                                <DataTrigger TargetType="Label"
+                                                             Binding="{Binding IsExpanded}"
+                                                             Value="True">
+                                                    <Setter Property="Rotation" Value="180" />
+                                                </DataTrigger>
+                                            </Label.Triggers>
+                                        </Label>
+                                    </Grid>
+                                </Border>
+                            </toolkit:Expander.Header>
+                            <VerticalStackLayout Padding="12,8"
+                                                 Spacing="4"
+                                                 BindableLayout.ItemsSource="{Binding Details}">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Label Text="{Binding .}" FontSize="14" />
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </toolkit:Expander>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+        </ScrollView>
+
+    </Grid>
+</ContentPage>

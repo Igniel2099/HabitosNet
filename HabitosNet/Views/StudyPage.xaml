@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="HabitosNet.Views.StudyPage"
+             Title="Estudiar">
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="12">
+
+            <!-- Selector de modo -->
+            <HorizontalStackLayout Spacing="8" HorizontalOptions="Center">
+                <Button Text="Pomodoro"
+                        Command="{Binding SelectModeCommand}"
+                        CommandParameter="Pomodoro">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding IsPomodoro}" Value="True">
+                            <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                            <Setter Property="TextColor" Value="{StaticResource White}" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+                <Button Text="Corto"
+                        Command="{Binding SelectModeCommand}"
+                        CommandParameter="Short">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding IsShort}" Value="True">
+                            <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                            <Setter Property="TextColor" Value="{StaticResource White}" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+                <Button Text="Largo"
+                        Command="{Binding SelectModeCommand}"
+                        CommandParameter="Long">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding IsLong}" Value="True">
+                            <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                            <Setter Property="TextColor" Value="{StaticResource White}" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+            </HorizontalStackLayout>
+
+            <!-- Reloj circular -->
+            <Border StrokeShape="Ellipse"
+                    WidthRequest="260"
+                    HeightRequest="260"
+                    StrokeThickness="4"
+                    HorizontalOptions="Center"
+                    VerticalOptions="Center">
+                <VerticalStackLayout VerticalOptions="Center" Spacing="0">
+                    <Label Text="{Binding TimeText}"
+                           FontSize="56"
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center" />
+                    <Label Text="Pomodoro" HorizontalOptions="Center" IsVisible="{Binding IsPomodoro}" />
+                    <Label Text="Descanso corto" HorizontalOptions="Center" IsVisible="{Binding IsShort}" />
+                    <Label Text="Descanso largo" HorizontalOptions="Center" IsVisible="{Binding IsLong}" />
+                    <Label Text="{Binding CycleText}"
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center" />
+                </VerticalStackLayout>
+            </Border>
+
+            <ProgressBar Progress="{Binding Progress}" />
+
+            <!-- Acciones -->
+            <HorizontalStackLayout Spacing="12" HorizontalOptions="Center">
+                <Button Text="{Binding ActionText}"
+                        Command="{Binding PlayPauseCommand}"
+                        MinimumWidthRequest="160" />
+                <Button Text="⏹" Command="{Binding StopCommand}" />
+            </HorizontalStackLayout>
+
+            <!-- Resumen de hoy (reflejado en Home vía SQLite) -->
+            <Border StrokeShape="RoundRectangle 12" Padding="12">
+                <Label FontSize="15" HorizontalOptions="Center">
+                    <Label.FormattedText>
+                        <FormattedString>
+                            <Span Text="Hoy: " />
+                            <Span Text="{Binding TodayStudyMinutes}" FontAttributes="Bold" />
+                            <Span Text=" / " />
+                            <Span Text="{Binding TodayStudyTarget}" FontAttributes="Bold" />
+                            <Span Text=" min" />
+                        </FormattedString>
+                    </Label.FormattedText>
+                </Label>
+            </Border>
+
+            <!-- Tiempos configurables (Preferences) -->
+            <Border StrokeShape="RoundRectangle 12" Padding="12">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Duración (min)" FontAttributes="Bold" FontSize="16" />
+
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" VerticalOptions="Center">
+                        <Label Text="Pomodoro" VerticalOptions="Center" />
+                        <Label Text="{Binding PomodoroMinutes}" VerticalOptions="Center" Grid.Column="1" />
+                        <Stepper Minimum="1" Maximum="120" Increment="1"
+                                 Value="{Binding PomodoroMinutes, Mode=TwoWay}"
+                                 Grid.Column="2" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" VerticalOptions="Center">
+                        <Label Text="Descanso corto" VerticalOptions="Center" />
+                        <Label Text="{Binding ShortMinutes}" VerticalOptions="Center" Grid.Column="1" />
+                        <Stepper Minimum="1" Maximum="60" Increment="1"
+                                 Value="{Binding ShortMinutes, Mode=TwoWay}"
+                                 Grid.Column="2" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" VerticalOptions="Center">
+                        <Label Text="Descanso largo" VerticalOptions="Center" />
+                        <Label Text="{Binding LongMinutes}" VerticalOptions="Center" Grid.Column="1" />
+                        <Stepper Minimum="1" Maximum="60" Increment="1"
+                                 Value="{Binding LongMinutes, Mode=TwoWay}"
+                                 Grid.Column="2" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

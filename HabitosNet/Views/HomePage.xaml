@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="HabitosNet.Views.HomePage"
+             Title="Home">
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="12">
+
+            <!-- Selector semanal Lun–Dom (LUN 28). Resalta seleccionado y hoy. -->
+            <CollectionView ItemsSource="{Binding Week}"
+                            SelectionMode="None"
+                            HeightRequest="72">
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Horizontal" ItemSpacing="8" />
+                </CollectionView.ItemsLayout>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Border StrokeShape="RoundRectangle 12"
+                                Padding="10,8"
+                                MinimumWidthRequest="64">
+                            <Border.Triggers>
+                                <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+                                </DataTrigger>
+                            </Border.Triggers>
+                            <VerticalStackLayout Spacing="0" VerticalOptions="Center">
+                                <Label Text="{Binding Title}"
+                                       FontAttributes="Bold"
+                                       FontSize="13"
+                                       HorizontalOptions="Center">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsSelected}" Value="True">
+                                            <Setter Property="TextColor" Value="{StaticResource White}" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                                <Label Text="HOY"
+                                       FontSize="10"
+                                       HorizontalOptions="Center"
+                                       IsVisible="{Binding IsToday}" />
+                            </VerticalStackLayout>
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectDayCommand}"
+                                    CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <!-- Aviso solo lectura -->
+            <Label Text="Solo lectura: este día no es editable."
+                   TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray200}}"
+                   IsVisible="False">
+                <Label.Triggers>
+                    <DataTrigger TargetType="Label" Binding="{Binding IsToday}" Value="False">
+                        <Setter Property="IsVisible" Value="True" />
+                    </DataTrigger>
+                </Label.Triggers>
+            </Label>
+
+            <!-- Card: Despertar -->
+            <Border StrokeShape="RoundRectangle 12" Padding="12">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Despertar" FontAttributes="Bold" FontSize="16">
+                        <Label.Triggers>
+                            <DataTrigger TargetType="Label" Binding="{Binding WakeDone}" Value="True">
+                                <Setter Property="TextDecorations" Value="Strikethrough" />
+                                <Setter Property="Opacity" Value="0.5" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
+                    <HorizontalStackLayout Spacing="12" VerticalOptions="Center">
+                        <TimePicker Time="{Binding WakeTime, Mode=TwoWay}"
+                                    IsEnabled="{Binding IsToday}" />
+                        <CheckBox IsChecked="{Binding WakeDone, Mode=TwoWay}"
+                                  IsEnabled="{Binding IsToday}"
+                                  VerticalOptions="Center" />
+                        <Label Text="Completado" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Card: Estirar -->
+            <Border StrokeShape="RoundRectangle 12" Padding="12">
+                <HorizontalStackLayout Spacing="12" VerticalOptions="Center">
+                    <Label Text="Estirar" FontAttributes="Bold" FontSize="16" VerticalOptions="Center">
+                        <Label.Triggers>
+                            <DataTrigger TargetType="Label" Binding="{Binding StretchDone}" Value="True">
+                                <Setter Property="TextDecorations" Value="Strikethrough" />
+                                <Setter Property="Opacity" Value="0.5" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
+                    <CheckBox IsChecked="{Binding StretchDone, Mode=TwoWay}"
+                              IsEnabled="{Binding IsToday}"
+                              VerticalOptions="Center" />
+                </HorizontalStackLayout>
+            </Border>
+
+            <!-- Card: Leer -->
+            <Border StrokeShape="RoundRectangle 12" Padding="12">
+                <VerticalStackLayout Spacing="8">
+                    <Label FontSize="16">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="Leer  " FontAttributes="Bold" />
+                                <Span Text="Objetivo: " />
+                                <Span Text="{Binding ReadTarget}" />
+                                <Span Text=" min" />
+                            </FormattedString>
+                        </Label.FormattedText>
+                        <Label.Triggers>
+                            <DataTrigger TargetType="Label" Binding="{Binding ReadDone}" Value="True">
+                                <Setter Property="TextDecorations" Value="Strikethrough" />
+                                <Setter Property="Opacity" Value="0.5" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
+                    <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+                        <Entry Text="{Binding ReadMinutes, Mode=TwoWay}"
+                               Placeholder="{Binding ReadPlaceholder}"
+                               Keyboard="Numeric"
+                               WidthRequest="90"
+                               IsEnabled="{Binding IsToday}" />
+                        <Stepper Minimum="0" Maximum="480" Increment="5"
+                                 Value="{Binding ReadMinutes, Mode=TwoWay}"
+                                 IsEnabled="{Binding IsToday}"
+                                 VerticalOptions="Center" />
+                        <CheckBox IsChecked="{Binding ReadDone, Mode=TwoWay}"
+                                  IsEnabled="{Binding IsToday}"
+                                  VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Card: Meditar -->
+            <Border StrokeShape="RoundRectangle 12" Padding="12">
+                <VerticalStackLayout Spacing="8">
+                    <Label FontSize="16">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="Meditar  " FontAttributes="Bold" />
+                                <Span Text="Objetivo: " />
+                                <Span Text="{Binding MeditateTarget}" />
+                                <Span Text=" min" />
+                            </FormattedString>
+                        </Label.FormattedText>
+                        <Label.Triggers>
+                            <DataTrigger TargetType="Label" Binding="{Binding MeditateDone}" Value="True">
+                                <Setter Property="TextDecorations" Value="Strikethrough" />
+                                <Setter Property="Opacity" Value="0.5" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
+                    <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+                        <Entry Text="{Binding MeditateMinutes, Mode=TwoWay}"
+                               Placeholder="{Binding MeditatePlaceholder}"
+                               Keyboard="Numeric"
+                               WidthRequest="90"
+                               IsEnabled="{Binding IsToday}" />
+                        <Stepper Minimum="0" Maximum="480" Increment="5"
+                                 Value="{Binding MeditateMinutes, Mode=TwoWay}"
+                                 IsEnabled="{Binding IsToday}"
+                                 VerticalOptions="Center" />
+                        <CheckBox IsChecked="{Binding MeditateDone, Mode=TwoWay}"
+                                  IsEnabled="{Binding IsToday}"
+                                  VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Card: Estudiar -->
+            <Border StrokeShape="RoundRectangle 12" Padding="12">
+                <VerticalStackLayout Spacing="8">
+                    <Label FontSize="16">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="Estudiar  " FontAttributes="Bold" />
+                                <Span Text="Objetivo: " />
+                                <Span Text="{Binding StudyTarget}" />
+                                <Span Text=" min" />
+                            </FormattedString>
+                        </Label.FormattedText>
+                        <Label.Triggers>
+                            <DataTrigger TargetType="Label" Binding="{Binding StudyDone}" Value="True">
+                                <Setter Property="TextDecorations" Value="Strikethrough" />
+                                <Setter Property="Opacity" Value="0.5" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
+                    <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+                        <Entry Text="{Binding StudyMinutes, Mode=TwoWay}"
+                               Placeholder="{Binding StudyPlaceholder}"
+                               Keyboard="Numeric"
+                               WidthRequest="90"
+                               IsEnabled="{Binding IsToday}" />
+                        <Stepper Minimum="0" Maximum="480" Increment="15"
+                                 Value="{Binding StudyMinutes, Mode=TwoWay}"
+                                 IsEnabled="{Binding IsToday}"
+                                 VerticalOptions="Center" />
+                        <CheckBox IsChecked="{Binding StudyDone, Mode=TwoWay}"
+                                  IsEnabled="{Binding IsToday}"
+                                  VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

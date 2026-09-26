@@ -1,4 +1,3 @@
 <Solution>
   <Project Path="HabitosNet/HabitosNet.csproj" />
-  <Project Path="HabitosNet.Tests/HabitosNet.Tests.csproj" />
 </Solution>

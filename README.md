@@ -1,55 +1,46 @@
 # HabitosNet
 
-Aplicación .NET 10 MAUI para organizar proyectos y tareas en Windows y Android. Los datos se guardan en SQLite en el dispositivo; no se sincronizan entre el ordenador y el móvil.
+Aplicación .NET 10 MAUI para el seguimiento diario de hábitos, en Android y Windows. Los datos se guardan en SQLite en el dispositivo; no se sincronizan entre el ordenador y el móvil.
 
-## Uso
+## Pantallas
 
-- **Inicio:** tareas pendientes, filtro de completadas, contadores y resumen por categoría. En una pantalla pequeña, el resumen se despliega con un botón.
-- **Proyectos:** búsqueda por nombre/descripción, progreso y acceso al detalle.
-- **Categorías y etiquetas:** nombres, colores y organización de proyectos. Una categoría utilizada debe reasignarse antes de eliminarla.
-- Al añadir tareas a un proyecto nuevo, pulsa **Guardar proyecto** para conservar el conjunto. Las tareas se pueden editar, completar y eliminar mientras son borradores.
-- Borrar un proyecto elimina sus tareas y asociaciones con etiquetas. Las etiquetas compartidas se conservan. La operación pide confirmación.
-- La apariencia clara/oscura se conserva entre sesiones.
+- **Home:** registro diario. Selector semanal (Lun–Dom, formato `LUN 28`), tarjetas por hábito (Despertar con `TimePicker`; Leer, Meditar y Estudiar con objetivo, campo numérico + `Stepper` y `CheckBox`). Solo el día de hoy es editable; el resto es de solo lectura. Al completar, el texto se tacha.
+- **Estudiar:** temporizador Pomodoro (Trabajo → Corto ×3 → Largo, ciclo de 4 con encadenado automático). Tiempos configurables guardados en `Preferences`. Al minimizar, congela y al volver recalcula por diferencia (sin servicios en segundo plano). Cada pomodoro completado suma minutos al registro de hoy.
+- **Histórico:** una semana visible con acordeón por día (`Expander`): cabecera con `X/5 tareas` y detalle de tiempos. Navegación entre semanas con ◀ ▶. El día actual (o el último con datos) abre expandido por defecto.
 
-## Distribución adaptable
+## Reglas de negocio
 
-La interfaz responde al ancho real, incluido el cambio de tamaño de una ventana y la orientación de Android. Los formularios se limitan a 920 unidades y pasan a dos columnas a partir de 800. Los proyectos usan una, dos o tres columnas; la navegación lateral se mantiene abierta en ventanas amplias. Las listas principales usan CollectionView y las acciones táctiles tienen un mínimo de 48 unidades.
+- **Edición diaria:** solo se edita el registro de HOY. Días pasados o futuros son de solo lectura.
+- **Sin registros inventados:** un día pasado sin registro se crea como NO completado (todo en `false`/`null`, solo se heredan los objetivos). Si al final del día no registraste nada, nada queda completado.
+- **Placeholders:** si el campo de tiempo está vacío, el placeholder muestra el tiempo real del día anterior; al marcar completado sin escribir nada, se asigna ese valor.
+
+## Arquitectura
+
+- MVVM estricto: lógica en `ViewModels`, XAML sin code-behind salvo inyección del ViewModel.
+- Entity Framework Core 10 + SQLite con `IDbContextFactory<AppDbContext>` (contextos efímeros).
+- Entidad central `DailyRegister` (un registro por fecha, índice único).
+- `CommunityToolkit.Mvvm` (`[ObservableProperty]`, `[RelayCommand]`) y `CommunityToolkit.Maui` (`Expander`, `UseMauiCommunityToolkit`).
 
 ## Compilar
 
-Requiere .NET 10 y las cargas de trabajo MAUI correspondientes. Android también necesita su SDK y JDK; Visual Studio puede instalarlos.
+Requiere .NET 10 y las cargas de trabajo MAUI. Android además necesita su SDK y JDK; Visual Studio puede instalarlos.
+
+```powershell
+dotnet build HabitosNet.slnx -v minimal
+```
+
+Por plataformas:
 
 ```powershell
 dotnet build HabitosNet/HabitosNet.csproj -f net10.0-windows10.0.19041.0
 dotnet build HabitosNet/HabitosNet.csproj -f net10.0-android
 ```
 
-Para generar un APK de pruebas que incluya los ensamblados de la aplicación (sin depender del despliegue rápido de Visual Studio):
+Abre `HabitosNet.slnx` en Visual Studio para ejecutar en Windows o un dispositivo/emulador Android.
 
-```powershell
-dotnet build HabitosNet/HabitosNet.csproj -f net10.0-android -p:EmbedAssembliesIntoApk=true
-```
+## Notas técnicas
 
-El resultado firmado para desarrollo queda en `HabitosNet/bin/Debug/net10.0-android/com.companyname.habitosnet-Signed.apk`.
-
-Abre `HabitosNet.slnx` en Visual Studio para ejecutar en Windows o un dispositivo/emulador Android. El primer build Android crea una clave de firma de desarrollo en el perfil de usuario.
-
-## Regresiones
-
-```powershell
-dotnet run --project HabitosNet.Tests/HabitosNet.Tests.csproj
-```
-
-El ejecutable de pruebas usa los repositorios y PageModels reales contra bases SQLite temporales, y termina con código distinto de cero si hay fallos. Las APIs de interfaz se sustituyen por dobles para verificar navegación, avisos y confirmaciones. No modifica la base de datos de la aplicación. Detalles en [HabitosNet.Tests/README.md](HabitosNet.Tests/README.md).
-
-Se comprueban borrado y reversión de proyectos, categorías utilizadas, tareas de borradores, validaciones, fallos SQL, reintentos, orden guardado/navegación e importación del JSON de ejemplo.
-
-## Comprobación visual en dispositivo
-
-La compilación y las pruebas de lógica no sustituyen esta revisión:
-
-1. Windows: redimensionar entre 360, 800 y 1280 unidades; recorrer los controles con Tab y comprobar nombres/descripciones largos.
-2. Android: comprobar vertical y horizontal, teclado visible al editar y tamaño de fuente ampliado.
-3. En ambos: tema claro/oscuro; añadir proyecto con tareas, completar un borrador, guardarlo y reabrirlo; intentar guardar una tarea sin proyecto y borrar una categoría utilizada.
-
-La dependencia SQLite conserva por ahora la versión original y sus avisos NU1903. Las opciones de actualización están en [docs/sqlite-security.md](docs/sqlite-security.md).
+- `Microsoft.Maui.Controls` está fijado a `10.0.90` porque `CommunityToolkit.Maui 15.0.1` lo exige (sin el pin falla el restore con NU1605).
+- El Histórico usa botones ◀ ▶ en lugar de `CarouselView`: el carrusel vía pestañas de Shell provoca un crash nativo solo en Windows.
+- Quedan avisos MVVMTK0045 (compatibilidad AOT en WinUI por usar `[ObservableProperty]` con fields); no bloquean la compilación.
+- Para empezar con datos limpios durante el desarrollo, desinstala la app o borra sus datos (la BD vive en `FileSystem.AppDataDirectory/habitos.db`).
